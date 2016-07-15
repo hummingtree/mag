@@ -81,7 +81,7 @@ void setDoArg(DoArg& do_arg, const int totalSite[4])
 	do_arg.gfix_chkb = 1;
 }
 
-void CPS2LQPS2File(const Coordinate &totalSize, int mag,
+void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			string config_addr, string export_addr,
 			int argc, char *argv[])
 {
@@ -108,7 +108,10 @@ void CPS2LQPS2File(const Coordinate &totalSize, int mag,
 	// Set up LQPS
 
 	begin(QMP_COMM_WORLD, Coordinate(SizeX(), SizeY(), SizeZ(), SizeT()));
-	Coordinate totalSite_qlat(mag * GJP.NodeSites(0) * SizeX(), mag * GJP.NodeSites(1) * SizeY(), mag * GJP.NodeSites(2) * SizeZ(), mag * GJP.NodeSites(3) * SizeT());
+	Coordinate totalSite_qlat(mag * GJP.NodeSites(0) * SizeX(), \
+				mag * GJP.NodeSites(1) * SizeY(), \
+				mag * GJP.NodeSites(2) * SizeZ(), \
+				mag * GJP.NodeSites(3) * SizeT());
         Geometry geo_;
         geo_.init(totalSite_qlat, DIM);
 
@@ -126,44 +129,129 @@ void CPS2LQPS2File(const Coordinate &totalSize, int mag,
 
 	// Transfer to LQPS
 
-	int x_cps[4];
 	// int x_qlat[4];
 
 	syncNode();
 	Coordinate coorNode; coorNodeFromIdNode(coorNode, getIdNode());
 	std::cout << "cps UniqueID(): " << UniqueID() << "; "
-		<< CoorX() << "x" << CoorY() << "x"<< CoorZ() << "x"<< CoorT() << "x" << "."
-			 << "qlat: getIdNode(): " << getIdNode() << "; "
+		<< CoorX() << "x" << CoorY() << "x"<< CoorZ() << "x"<< CoorT() << "."
+			 << "\tqlat: getIdNode(): " << getIdNode() << "; "
 				<< show(coorNode) << "." << std::endl;
 
-	for(int i = 0; i < GJP.NodeSites(0); i++){ 
-	for(int j = 0; j < GJP.NodeSites(1); j++){
-	for(int k = 0; k < GJP.NodeSites(2); k++){
-	for(int l = 0; l < GJP.NodeSites(3); l++){	
+	syncNode();
+#pragma omp parallel for
+	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
+		
+		int x_cps[4]; GJP.LocalIndex(local_index, x_cps);
+		Coordinate x_qlat(mag * x_cps[0], mag * x_cps[1], mag * x_cps[2], mag * x_cps[3]);
+                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+                vec_qlat[0] = *lat.GetLink(x_cps, 0);
+                vec_qlat[1] = *lat.GetLink(x_cps, 1);
+                vec_qlat[2] = *lat.GetLink(x_cps, 2);
+                vec_qlat[3] = *lat.GetLink(x_cps, 3);	
+	
+	}	
+	// for(int i = 0; i < GJP.NodeSites(0); i++){ 
+	// for(int j = 0; j < GJP.NodeSites(1); j++){
+	// for(int k = 0; k < GJP.NodeSites(2); k++){
+	// for(int l = 0; l < GJP.NodeSites(3); l++){	
 
-		x_cps[0] = i; x_cps[1] = j; x_cps[2] = k; x_cps[3] = l;
-		Coordinate x_qlat(mag * i, mag * j, mag * k, mag * l);
-		qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
-		vec_qlat[0] = *lat.GetLink(x_cps, 0);
-		vec_qlat[1] = *lat.GetLink(x_cps, 1);
-		vec_qlat[2] = *lat.GetLink(x_cps, 2);
-		vec_qlat[3] = *lat.GetLink(x_cps, 3);
+	// 	x_cps[0] = i; x_cps[1] = j; x_cps[2] = k; x_cps[3] = l;
+	// 	Coordinate x_qlat(mag * i, mag * j, mag * k, mag * l);
+	// 	qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+	// 	vec_qlat[0] = *lat.GetLink(x_cps, 0);
+	// 	vec_qlat[1] = *lat.GetLink(x_cps, 1);
+	// 	vec_qlat[2] = *lat.GetLink(x_cps, 2);
+	// 	vec_qlat[3] = *lat.GetLink(x_cps, 3);
 
-	}}}}
-
+	// }}}}
+	std::cout << "Field expansion finished." << std::endl;
 	syncNode();
 	
-	sophisticated_serial_write(gauge_field_qlat, export_addr, false, true);
+	sophisticated_serial_write(gauge_field_qlat, export_addr, false, false);
 
 	LatticeFactory::Destroy();
 
-	if(mag == 1) load_config(export_addr);
+	// if(mag == 1) load_config(export_addr);
 
+	std::cout << "Start to read config." << std::endl;
+
+	qlat::Field<cps::Matrix> gauge_field_qlat_read; gauge_field_qlat_read.init(geo_);
+	gauge_field_qlat_read = gauge_field_qlat;
+	sophisticated_serial_read(gauge_field_qlat_read, export_addr);
+
+#pragma omp parallel for
+	for(long index = 0; index < geo_.localVolume(); index++){
+		Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+		qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+		qlat::Vector<cps::Matrix> vec_qlat_read(gauge_field_qlat_read.getElems(x_qlat));
+
+		for(int mu = 0; mu < geo_.multiplicity; mu++){
+		// only works for cps::Matrix
+		double sum = 0.;
+		for(int i = 0; i < 9; i++){
+		sum += std::norm(vec_qlat[mu][i] - vec_qlat_read[mu][i]);
+		}
+		assert(sum < 1e-5);
+	}}
+	
 	End();
 
 	// end();
 
 }
+
+void start_cps_qlat(const Coordinate &totalSize,
+			int argc, char *argv[])
+{
+	int totalSize_cps[] = {totalSize[0], totalSize[1], totalSize[2], totalSize[3]};
+	Start(&argc, &argv);
+	DoArg do_arg;
+	setDoArg(do_arg, totalSize_cps);
+	GJP.Initialize(do_arg);
+	LRG.Initialize();
+
+	begin(QMP_COMM_WORLD, Coordinate(SizeX(), SizeY(), SizeZ(), SizeT()));
+
+}
+
+void File2QLAT2CPS(const Coordinate &totalSize, int mag,
+			string export_addr,
+			int argc, char *argv[])
+{
+	// Suppose to read in the expanded file and transfer that to cps.
+	//
+	
+	start_cps_qlat(totalSize, argc, argv);
+
+	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_NONE);
+
+        Geometry geo_;
+        geo_.init(totalSize, DIM);
+	qlat::Field<cps::Matrix> gauge_field_qlat;
+	gauge_field_qlat.init(geo_);
+
+	sophisticated_serial_read(gauge_field_qlat, export_addr);
+
+#pragma omp parallel for
+	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
+		
+		int x_cps[4]; GJP.LocalIndex(local_index, x_cps);
+		Coordinate x_qlat(x_cps[0], x_cps[1], x_cps[2], x_cps[3]);
+                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+		cps::Matrix *ptr = lat.GaugeField();
+                *(ptr + 4 * local_index + 0) = vec_qlat[0];
+                *(ptr + 4 * local_index + 1) = vec_qlat[1];
+                *(ptr + 4 * local_index + 2) = vec_qlat[2];
+                *(ptr + 4 * local_index + 3) = vec_qlat[3];
+	}
+
+	std::cout << lat.SumReTrPlaq() / (18. * GJP.VolSites())  << std::endl;
+
+	std::cout << "Transfer to cps ready." << std::endl;	
+}
+
+
 
 bool doesFileExist(const char *fn){
   struct stat sb;
@@ -173,16 +261,24 @@ bool doesFileExist(const char *fn){
 int main(int argc, char* argv[]){
 	
 	Coordinate totalSize(24, 24, 24, 64);
-	int mag_factor = 4;
-	string config = "/bgusr/home/ljin/qcdarchive/DWF_iwa_nf2p1/24c64/"
-		"2plus1_24nt64_IWASAKI_b2p13_ls16_M1p8_ms0p04_mu0p005_rhmc_H_R_G/"
-		"ckpoint_lat.IEEE64BIG.5000";	
+	int mag_factor = 1;
+	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
+		"ckpoint_lat.300";
+		// "/bgusr/home/ljin/qcdarchive/DWF_iwa_nf2p1/24c64/"
+		// "2plus1_24nt64_IWASAKI_b2p13_ls16_M1p8_ms0p04_mu0p005_rhmc_H_R_G/"
+		// "ckpoint_lat.IEEE64BIG.5000";	
 	
-	string output = "/bgusr/home/jtu/config/ckpoint_lat.IEEE64BIG.5000_mag" + show((long)mag_factor);
+	string expanded_config = "/bgusr/home/jtu/config/"
+		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
+			"ckpoint_lat.300_mag" + show((long)mag_factor);
 	
-	// if(!doesFileExist(output.c_str()))
-		CPS2LQPS2File(totalSize, mag_factor, config, output, argc, argv);
+	if(!doesFileExist(expanded_config.c_str())){
+		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
+		return 0;
+	}
 
+	File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
+	
 	cout << "Program ended normally." << endl;
 
 	return 0;
