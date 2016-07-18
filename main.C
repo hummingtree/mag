@@ -151,22 +151,9 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
                 vec_qlat[3] = *lat.GetLink(x_cps, 3);	
 	
 	}	
-	// for(int i = 0; i < GJP.NodeSites(0); i++){ 
-	// for(int j = 0; j < GJP.NodeSites(1); j++){
-	// for(int k = 0; k < GJP.NodeSites(2); k++){
-	// for(int l = 0; l < GJP.NodeSites(3); l++){	
-
-	// 	x_cps[0] = i; x_cps[1] = j; x_cps[2] = k; x_cps[3] = l;
-	// 	Coordinate x_qlat(mag * i, mag * j, mag * k, mag * l);
-	// 	qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
-	// 	vec_qlat[0] = *lat.GetLink(x_cps, 0);
-	// 	vec_qlat[1] = *lat.GetLink(x_cps, 1);
-	// 	vec_qlat[2] = *lat.GetLink(x_cps, 2);
-	// 	vec_qlat[3] = *lat.GetLink(x_cps, 3);
-
-	// }}}}
-	std::cout << "Field expansion finished." << std::endl;
+	
 	syncNode();
+	if(UniqueID() == 0) std::cout << "Field expansion finished." << std::endl;
 	
 	sophisticated_serial_write(gauge_field_qlat, export_addr, false, false);
 
@@ -246,9 +233,11 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
                 *(ptr + 4 * local_index + 3) = vec_qlat[3];
 	}
 
-	std::cout << lat.SumReTrPlaq() / (18. * GJP.VolSites())  << std::endl;
+	// std::cout << lat.SumReTrPlaq() / (18. * GJP.VolSites())  << std::endl;
 
-	std::cout << "Transfer to cps ready." << std::endl;	
+	syncNode();
+	if(UniqueID() == 0) std::cout << "Transfer to cps ready." << std::endl;
+	syncNode();
 }
 
 
@@ -272,14 +261,16 @@ int main(int argc, char* argv[]){
 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 			"ckpoint_lat.300_mag" + show((long)mag_factor);
 	
-	if(!doesFileExist(expanded_config.c_str())){
+	// if(!doesFileExist(expanded_config.c_str())){
 		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
 		return 0;
-	}
+	// }
 
-	File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
+	// File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
+
+	syncNode();
 	
-	cout << "Program ended normally." << endl;
+	if(UniqueID() == 0) cout << "Program ended normally." << endl;
 
 	return 0;
 }

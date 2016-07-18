@@ -5,7 +5,7 @@
 #----------------------------------------------------------------------
 
 
-UTIL = ~/bin/
+UTIL = ~/bin
 SRCDIR = /bgusr/home/jtu/cps-jtu-build/1.0/build/../cps_pp
 BUILDDIR = /bgusr/home/jtu/cps-jtu-build/1.0/build
 QOS = 
