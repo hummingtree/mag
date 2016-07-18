@@ -250,7 +250,7 @@ bool doesFileExist(const char *fn){
 int main(int argc, char* argv[]){
 	
 	Coordinate totalSize(24, 24, 24, 64);
-	int mag_factor = 1;
+	int mag_factor = 4;
 	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
 		"ckpoint_lat.300";
 		// "/bgusr/home/ljin/qcdarchive/DWF_iwa_nf2p1/24c64/"
@@ -261,12 +261,12 @@ int main(int argc, char* argv[]){
 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 			"ckpoint_lat.300_mag" + show((long)mag_factor);
 	
-	// if(!doesFileExist(expanded_config.c_str())){
+	if(!doesFileExist(expanded_config.c_str())){
 		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
 		return 0;
-	// }
+	}
 
-	// File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
+	File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
 
 	syncNode();
 	
