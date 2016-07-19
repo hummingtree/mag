@@ -218,7 +218,7 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	qlat::Field<cps::Matrix> gauge_field_qlat;
 	gauge_field_qlat.init(geo_);
 
-	sophisticated_serial_read(gauge_field_qlat, export_addr);
+	sophisticated_serial_read(gauge_field_qlat, export_addr, 64);
 
 #pragma omp parallel for
 	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
