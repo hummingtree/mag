@@ -6,6 +6,7 @@
 #include <qlat/mpi.h>
 #include <qlat/field.h>
 #include <qlat/field-io.h>
+#include <qlat/field-comm.h>
 
 #include <iostream>
 #include <fstream>
@@ -31,6 +32,8 @@
 
 // #include<qmp.h>
 // #include<mpi.h>
+
+#define PARALLEL_READING_THREADS 1
 
 using namespace std;
 using namespace cps;
@@ -159,13 +162,13 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 
 	LatticeFactory::Destroy();
 
-	// if(mag == 1) load_config(export_addr);
+	if(mag == 1) load_config(export_addr);
 
 	std::cout << "Start to read config." << std::endl;
 
 	qlat::Field<cps::Matrix> gauge_field_qlat_read; gauge_field_qlat_read.init(geo_);
 	gauge_field_qlat_read = gauge_field_qlat;
-	sophisticated_serial_read(gauge_field_qlat_read, export_addr);
+	sophisticated_serial_read(gauge_field_qlat_read, export_addr, PARALLEL_READING_THREADS );
 
 #pragma omp parallel for
 	for(long index = 0; index < geo_.localVolume(); index++){
@@ -181,6 +184,10 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 		}
 		assert(sum < 1e-5);
 	}}
+
+	syncNode();
+
+	if(UniqueID() == 0) cout << "Matching Verified." << endl;
 	
 	End();
 
@@ -218,7 +225,7 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	qlat::Field<cps::Matrix> gauge_field_qlat;
 	gauge_field_qlat.init(geo_);
 
-	sophisticated_serial_read(gauge_field_qlat, export_addr, 64);
+	sophisticated_serial_read(gauge_field_qlat, export_addr, PARALLEL_READING_THREADS );
 
 #pragma omp parallel for
 	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
@@ -250,7 +257,7 @@ bool doesFileExist(const char *fn){
 int main(int argc, char* argv[]){
 	
 	Coordinate totalSize(24, 24, 24, 64);
-	int mag_factor = 4;
+	int mag_factor = 2;
 	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
 		"ckpoint_lat.300";
 		// "/bgusr/home/ljin/qcdarchive/DWF_iwa_nf2p1/24c64/"
@@ -261,10 +268,10 @@ int main(int argc, char* argv[]){
 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 			"ckpoint_lat.300_mag" + show((long)mag_factor);
 	
-	if(!doesFileExist(expanded_config.c_str())){
+	// if(!doesFileExist(expanded_config.c_str())){
 		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
 		return 0;
-	}
+	// }
 
 	File2QLAT2CPS(mag_factor * totalSize, mag_factor, expanded_config, argc, argv);
 
