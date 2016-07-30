@@ -139,6 +139,21 @@ double avg_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat){
 	return global_sum / (18. * getNumNode() * geo_.localVolume());
 }
 
+double avg_real_trace(qlat::Field<cps::Matrix> &gauge_field_qlat){
+	qlat::Geometry geo_ = gauge_field_qlat.geo;
+	double tr_node_sum = 0.;
+	for(long index = 0; index < geo_.localVolume(); index++){
+		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+		 for(int mu = 0; mu < DIM; mu++){
+		 	tr_node_sum += (gauge_field_qlat.getElems(x_qlat)[mu]).ReTr();
+		 }
+	}
+	double tr_global_sum = 0.;
+	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+
+	return tr_global_sum / (12. * getNumNode() * geo_.localVolume());
+}
+
 void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			string config_addr, string export_addr,
 			int argc, char *argv[])
@@ -204,18 +219,8 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	fetch_expanded(gauge_field_qlat);
 
 	cout << avg_plaquette(gauge_field_qlat) << endl;
-
-	double tr_node_sum = 0.;
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 	tr_node_sum += (gauge_field_qlat.getElems(x_qlat)[mu]).ReTr();
-		 }
-	}
-	double tr_global_sum = 0.;
-	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	cout << "trace avg = " << tr_global_sum / (12. * getNumNode() * geo_.localVolume()) << endl;
+	cout << avg_real_trace(gauge_field_qlat) << endl;
+	
 
 	// sophisticated_serial_write(gauge_field_qlat, export_addr, false, false);
 
