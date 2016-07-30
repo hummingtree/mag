@@ -84,6 +84,61 @@ void setDoArg(DoArg& do_arg, const int totalSite[4])
 	do_arg.gfix_chkb = 1;
 }
 
+void naive_field_expansion(const cps::Lattice &lat, 
+			qlat::Field<cps::Matrix> &gauge_field_qlat, int mag)
+{
+	syncNode();
+#pragma omp parallel for
+	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
+		int x_cps[4]; GJP.LocalIndex(local_index, x_cps);
+		Coordinate x_qlat(mag * x_cps[0], mag * x_cps[1],
+					mag * x_cps[2], mag * x_cps[3]);
+                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+                vec_qlat[0] = *lat.GetLink(x_cps, 0);
+                vec_qlat[1] = *lat.GetLink(x_cps, 1);
+                vec_qlat[2] = *lat.GetLink(x_cps, 2);
+                vec_qlat[3] = *lat.GetLink(x_cps, 3);	
+	}	
+	syncNode();
+	if(UniqueID() == 0) std::cout << "Field expansion finished." << std::endl;
+}
+
+double avg_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat){
+	std::vector<Coordinate> dir_vec(4);
+	dir_vec[0] = Coordinate(1, 0, 0, 0);
+	dir_vec[1] = Coordinate(0, 1, 0, 0);
+	dir_vec[2] = Coordinate(0, 0, 1, 0);
+	dir_vec[3] = Coordinate(0, 0, 0, 1);
+
+	qlat::Geometry geo_ = gauge_field_qlat.geo;
+
+	double node_sum = 0.;
+	for(long index = 0; index < geo_.localVolume(); index++){
+		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+		 for(int mu = 0; mu < DIM; mu++){
+		 for(int nu = 0; nu < mu; nu++){	
+		 	cps::Matrix mul; mul.UnitMatrix();
+			mul = mul * gauge_field_qlat.getElems(x_qlat)[mu];
+			x_qlat = x_qlat + dir_vec[mu];
+			mul = mul * gauge_field_qlat.getElems(x_qlat)[nu];
+			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
+			cps::Matrix dag1; 
+			dag1.Dagger(gauge_field_qlat.getElems(x_qlat)[mu]);
+			mul = mul * dag1;
+			x_qlat = x_qlat - dir_vec[nu];
+			cps::Matrix dag2;
+			dag2.Dagger(gauge_field_qlat.getElems(x_qlat)[nu]);
+			mul = mul * dag2;
+
+			node_sum += mul.ReTr();
+		 }}
+	}
+	double global_sum;
+	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+
+	return global_sum / (18. * getNumNode() * geo_.localVolume());
+}
+
 void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			string config_addr, string export_addr,
 			int argc, char *argv[])
@@ -117,6 +172,9 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 				mag * GJP.NodeSites(3) * SizeT());
         Geometry geo_;
         geo_.init(totalSite_qlat, DIM);
+	// expand geometry to test the communication.
+	Coordinate expansion(2, 2, 2, 2);
+	geo_.resize(expansion, expansion);
 
 	qlat::Field<cps::Matrix> gauge_field_qlat;
 	gauge_field_qlat.init(geo_);
@@ -141,53 +199,54 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			 << "\tqlat: getIdNode(): " << getIdNode() << "; "
 				<< show(coorNode) << "." << std::endl;
 
-	syncNode();
-#pragma omp parallel for
-	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
-		
-		int x_cps[4]; GJP.LocalIndex(local_index, x_cps);
-		Coordinate x_qlat(mag * x_cps[0], mag * x_cps[1], mag * x_cps[2], mag * x_cps[3]);
-                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
-                vec_qlat[0] = *lat.GetLink(x_cps, 0);
-                vec_qlat[1] = *lat.GetLink(x_cps, 1);
-                vec_qlat[2] = *lat.GetLink(x_cps, 2);
-                vec_qlat[3] = *lat.GetLink(x_cps, 3);	
-	
-	}	
-	
-	syncNode();
-	if(UniqueID() == 0) std::cout << "Field expansion finished." << std::endl;
-	
-	sophisticated_serial_write(gauge_field_qlat, export_addr, false, false);
+	naive_field_expansion(lat, gauge_field_qlat, mag);
 
-	LatticeFactory::Destroy();
+	fetch_expanded(gauge_field_qlat);
 
-	if(mag == 1) load_config(export_addr);
+	cout << avg_plaquette(gauge_field_qlat) << endl;
 
-	std::cout << "Start to read config." << std::endl;
-
-	qlat::Field<cps::Matrix> gauge_field_qlat_read; gauge_field_qlat_read.init(geo_);
-	gauge_field_qlat_read = gauge_field_qlat;
-	sophisticated_serial_read(gauge_field_qlat_read, export_addr, PARALLEL_READING_THREADS );
-
-#pragma omp parallel for
+	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.localVolume(); index++){
-		Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
-		qlat::Vector<cps::Matrix> vec_qlat_read(gauge_field_qlat_read.getElems(x_qlat));
+		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+		 for(int mu = 0; mu < DIM; mu++){
+		 	tr_node_sum += (gauge_field_qlat.getElems(x_qlat)[mu]).ReTr();
+		 }
+	}
+	double tr_global_sum = 0.;
+	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
 
-		for(int mu = 0; mu < geo_.multiplicity; mu++){
-		// only works for cps::Matrix
-		double sum = 0.;
-		for(int i = 0; i < 9; i++){
-		sum += std::norm(vec_qlat[mu][i] - vec_qlat_read[mu][i]);
-		}
-		assert(sum < 1e-5);
-	}}
+	cout << "trace avg = " << tr_global_sum / (12. * getNumNode() * geo_.localVolume()) << endl;
 
-	syncNode();
+	// sophisticated_serial_write(gauge_field_qlat, export_addr, false, false);
 
-	if(UniqueID() == 0) cout << "Matching Verified." << endl;
+// 	LatticeFactory::Destroy();
+// 
+// 	if(mag == 1) load_config(export_addr);
+// 
+// 	std::cout << "Start to read config." << std::endl;
+// 
+// 	qlat::Field<cps::Matrix> gauge_field_qlat_read; gauge_field_qlat_read.init(geo_);
+// 	gauge_field_qlat_read = gauge_field_qlat;
+// 	sophisticated_serial_read(gauge_field_qlat_read, export_addr, PARALLEL_READING_THREADS);
+// 
+// #pragma omp parallel for
+// 	for(long index = 0; index < geo_.localVolume(); index++){
+// 		Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+// 		qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+// 		qlat::Vector<cps::Matrix> vec_qlat_read(gauge_field_qlat_read.getElems(x_qlat));
+// 
+// 		for(int mu = 0; mu < geo_.multiplicity; mu++){
+// 		// only works for cps::Matrix
+// 		double sum = 0.;
+// 		for(int i = 0; i < 9; i++){
+// 		sum += std::norm(vec_qlat[mu][i] - vec_qlat_read[mu][i]);
+// 		}
+// 		assert(sum < 1e-5);
+// 	}}
+// 
+// 	syncNode();
+// 
+// 	if(UniqueID() == 0) cout << "Matching Verified." << endl;
 	
 	End();
 
@@ -257,7 +316,7 @@ bool doesFileExist(const char *fn){
 int main(int argc, char* argv[]){
 	
 	Coordinate totalSize(24, 24, 24, 64);
-	int mag_factor = 2;
+	int mag_factor = 1;
 	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
 		"ckpoint_lat.300";
 		// "/bgusr/home/ljin/qcdarchive/DWF_iwa_nf2p1/24c64/"

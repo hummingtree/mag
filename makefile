@@ -55,6 +55,9 @@ all: clean $(BIN)
 run: 
 	$(UTIL)/run-job.sh ./run.sh
 
+see:
+	tail logs/latest -f
+
 .SUFFIXES:
 .SUFFIXES:  .o .C .S .c
 
