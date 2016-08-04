@@ -13,7 +13,7 @@ QOSLIB = ${QOS}/quser/gcc-lib-user///
 CC = /bgsys/drivers/ppcfloor/comm/gcc/bin/mpicc
 CXX = /bgsys/drivers/ppcfloor/comm/gcc/bin/mpicxx
 AS  = /bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc64-bgq-linux-as
-LDFLAGS =  -lqdp -fopenmp -lgmp -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lqmp -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lqmp -lqio -llime  -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lxml2 -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/lib  -lqdp -lXPathReader -lxmlWriter -lxml2 -lqio -lbfm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lgsl -lgslcblas -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lxml2 -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lfftw3
+LDFLAGS =  -lqdp -fopenmp -lgmp -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lqmp -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lqmp -lqio -llime  -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lxml2 -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/lib  -lqdp -lXPathReader -lxmlWriter -lxml2 -lqio -lbfm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lgsl -lgslcblas -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lxml2 -lm -L/bgusr/home/jtu/cps-jtu-build/1.0/local/lib -lfftw3 -L/bgusr/home/jtu/qlat-builds/0.1/lib -lhash-cpp
 
 me = $(notdir $(PWD))
 BIN = BGQ.x
@@ -25,7 +25,7 @@ BIN = BGQ.x
 #
 # include list for the Columbia code
 #
-INCLIST = -I${BUILDDIR} -I${SRCDIR}/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/include  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include    -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/eigen3 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/Qlattice/
+INCLIST = -I${BUILDDIR} -I${SRCDIR}/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/include  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include    -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/eigen3 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/Qlattice/ -I/bgusr/home/jtu/qlat-builds/0.1/include 
 
 CFLAGS= -g -O2 -fopenmp -O2 -Wall -std=c++0x
 CXXFLAGS=  -fopenmp -O2 -Wall -std=c++0x
