@@ -24,6 +24,8 @@
 using namespace std;
 using namespace cps;
 
+double oneThird = 1. / 3., minusOneThird = -1. / 3.;
+
 extern MPI_Comm QMP_COMM_WORLD;
 
 void load_config(string lat_file)
@@ -119,4 +121,5 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
 
         return global_sum / (3. * count * NumNodes());
 }
+
 

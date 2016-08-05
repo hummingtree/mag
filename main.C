@@ -33,6 +33,7 @@
 #include <qlat/field-comm.h>
 
 #include "cps_util.h"
+#include "alg_gchb.h"
 
 // #include<qmp.h>
 // #include<mpi.h>
@@ -293,7 +294,7 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	
 	start_cps_qlat(mag * totalSize, argc, argv);
 
-	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_NONE);
+	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_WILSON);
         
 	syncNode();
 	cps::Matrix *ptr = lat.GaugeField();
@@ -332,13 +333,28 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	lat.Reunitarize();
 
 	cout.precision(16);
-
+	
 	cout << "plaq = " << lat.SumReTrPlaq() / (18. * GJP.VolSites()) << endl;
 	cout << "cons = " << check_constrained_plaquette(lat, mag) << endl;
 	
 	syncNode();
 	if(UniqueID() == 0) std::cout << "Transfer to cps ready." << std::endl;
 	syncNode();
+
+	gchbArg gchbArg_;
+	gchbArg_.mag = mag;
+	gchbArg_.numIter = 50;
+	gchbArg_.nHits = 10;
+	gchbArg_.small = 0.2;
+
+	CommonArg commonArg_;
+
+	algGCtrnHeatBath algGCtrnHeatBath_(lat, &commonArg_, &gchbArg_);
+	algGCtrnHeatBath_.run();
+	
+	cout << "plaq = " << lat.SumReTrPlaq() / (18. * GJP.VolSites()) << endl;
+	cout << "cons = " << check_constrained_plaquette(lat, mag) << endl;
+
 }
 
 
