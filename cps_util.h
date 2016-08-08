@@ -79,7 +79,6 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
         for(int x2 = 0; x2 < GJP.ZnodeSites(); x2 += mag){
         for(int x3 = 0; x3 < GJP.TnodeSites(); x3 += mag){
                 int x[] = {x0, x1, x2, x3};
-		std::vector<int> dir(0); assert(dir.size() == 0);
                 for(int mu = 0; mu < 4; mu++){
                 for(int nu = 0; nu < mu; nu++){
 			cps::Matrix mul; mul.UnitMatrix();

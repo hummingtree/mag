@@ -63,108 +63,6 @@ void naive_field_expansion(const cps::Lattice &lat,
 	if(UniqueID() == 0) std::cout << "Field expansion finished." << std::endl;
 }
 
-double avg_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
-	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 for(int nu = 0; nu < mu; nu++){	
-		 	cps::Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.getElems(x_qlat)[mu];
-			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.getElems(x_qlat)[nu];
-			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			cps::Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.getElems(x_qlat)[mu]);
-			mul = mul * dag1;
-			x_qlat = x_qlat - dir_vec[nu];
-			cps::Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.getElems(x_qlat)[nu]);
-			mul = mul * dag2;
-
-			node_sum += mul.ReTr();
-		 }}
-	}
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum / (18. * getNumNode() * geo_.localVolume());
-}
-
-double avg_real_trace(qlat::Field<cps::Matrix> &gauge_field_qlat){
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-	double tr_node_sum = 0.;
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 	tr_node_sum += (gauge_field_qlat.getElems(x_qlat)[mu]).ReTr();
-		 }
-	}
-	double tr_global_sum = 0.;
-	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return tr_global_sum / (12. * getNumNode() * geo_.localVolume());
-}
-
-double check_constrained_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat,
-					int mag){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-	
-	long count = 0;
-	double node_sum = 0.;
-	for(int x0 = 0; x0 < geo_.nodeSite[0]; x0 += mag){
-	for(int x1 = 0; x1 < geo_.nodeSite[1]; x1 += mag){
-	for(int x2 = 0; x2 < geo_.nodeSite[2]; x2 += mag){
-	for(int x3 = 0; x3 < geo_.nodeSite[3]; x3 += mag){
-		Coordinate x(x0, x1, x2, x3);
-		for(int mu = 0; mu < DIM; mu++){
-		for(int nu = 0; nu < mu; nu++){
-			cps::Matrix mul; mul.UnitMatrix();
-			for(int i = 0; i < mag; i++){
-				mul = mul * gauge_field_qlat.getElems(x)[mu];
-				x = x + dir_vec[mu];
-			}
-			for(int i = 0; i < mag; i++){
-				mul = mul * gauge_field_qlat.getElems(x)[nu];
-				x = x + dir_vec[nu];
-			}
-			cps::Matrix dag;
-			for(int i = 0; i < mag; i++){
-				x = x - dir_vec[mu];
-				dag.Dagger(gauge_field_qlat.getElems(x)[mu]);
-				mul = mul * dag;
-			}
-			for(int i = 0; i < mag; i++){
-				x = x - dir_vec[nu];
-				dag.Dagger(gauge_field_qlat.getElems(x)[nu]);
-				mul = mul * dag;
-			}
-			count++;
-			node_sum += mul.ReTr();
-		}}
-	}}}}
-
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum / (3. * count * getNumNode());
-}
-
 void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			string config_addr, string export_addr,
 			int argc, char *argv[])
@@ -271,13 +169,14 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 
 }
 
-void start_cps_qlat(const Coordinate &totalSize,
+void start_cps_qlat(const Coordinate &totalSize, double beta,
 			int argc, char *argv[])
 {
 	int totalSize_cps[] = {totalSize[0], totalSize[1], totalSize[2], totalSize[3]};
 	Start(&argc, &argv);
 	DoArg do_arg;
 	setDoArg(do_arg, totalSize_cps);
+	do_arg.beta = beta;
 	GJP.Initialize(do_arg);
 	LRG.Initialize();
 
@@ -292,7 +191,9 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	// Suppose to read in the expanded file and transfer that to cps.
 	//
 	
-	start_cps_qlat(mag * totalSize, argc, argv);
+	start_cps_qlat(mag * totalSize, 1.633, argc, argv);
+
+	//	VRB.Level(VERBOSE_DEBUG_LEVEL);
 
 	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_WILSON);
         
@@ -332,11 +233,18 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	
 	lat.Reunitarize();
 
+	double avgPlaq, avgConsPlaq;
+
 	cout.precision(16);
 	
-	cout << "plaq = " << lat.SumReTrPlaq() / (18. * GJP.VolSites()) << endl;
-	cout << "cons = " << check_constrained_plaquette(lat, mag) << endl;
-	
+	avgPlaq = lat.SumReTrPlaq() / (18. * GJP.VolSites());
+	avgConsPlaq = check_constrained_plaquette(lat, mag);
+
+	if(UniqueID() == 0){
+		cout << "avgPlaq = " << avgPlaq << ",\t"
+			<< "avgConsPlaq = " << avgConsPlaq << endl;
+	}
+		
 	syncNode();
 	if(UniqueID() == 0) std::cout << "Transfer to cps ready." << std::endl;
 	syncNode();
@@ -350,10 +258,20 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 	CommonArg commonArg_;
 
 	algGCtrnHeatBath algGCtrnHeatBath_(lat, &commonArg_, &gchbArg_);
-	algGCtrnHeatBath_.run();
-	
-	cout << "plaq = " << lat.SumReTrPlaq() / (18. * GJP.VolSites()) << endl;
-	cout << "cons = " << check_constrained_plaquette(lat, mag) << endl;
+	if(UniqueID() == 0) algGCtrnHeatBath_.showInfo();
+
+	for(int i = 0; i < 20; i++){
+		algGCtrnHeatBath_.run();
+		avgPlaq = lat.SumReTrPlaq() / (18. * GJP.VolSites());
+		avgConsPlaq = check_constrained_plaquette(lat, mag);
+
+		if(UniqueID() == 0){
+			cout << "Thermalization Cycle = " << i << ",\t"
+				<< "avgPlaq = " << avgPlaq << ",\t"
+			 	<< "avgConsPlaq = " << avgConsPlaq << endl;
+			algGCtrnHeatBath_.accpetRate();
+		}
+	}
 
 }
 

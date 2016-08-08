@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include <config.h>
 #include <stdlib.h>	
 #include <util/qcdio.h>
@@ -54,32 +56,42 @@ Matrix getRandomSU3BySubsu2(double small){
 
         select = LRG.Urand();
 
-        if(select < minusOneThird){
-                ret[0] = a;   ret[2] = c;   ret[4] = 0.;
-                ret[6] = -c;  ret[8] = a;   ret[10] = 0.;
-                ret[12] = 0.; ret[14] = 0.; ret[16] = 1.;
+	Float *mPtr = (Float *)&ret;
 
-                ret[1] = b;   ret[3] = d;   ret[5] = 0.;
-                ret[7] = d;   ret[9] = -b;  ret[11] = 0.;
-                ret[13] = 0.; ret[15] = 0.; ret[17] = 0.;
+        if(select < minusOneThird){
+                mPtr[0] = a;   mPtr[2] = c;   mPtr[4] = 0.;
+                mPtr[6] = -c;  mPtr[8] = a;   mPtr[10] = 0.;
+                mPtr[12] = 0.; mPtr[14] = 0.; mPtr[16] = 1.;
+
+                mPtr[1] = b;   mPtr[3] = d;   mPtr[5] = 0.;
+                mPtr[7] = d;   mPtr[9] = -b;  mPtr[11] = 0.;
+                mPtr[13] = 0.; mPtr[15] = 0.; mPtr[17] = 0.;
         }else
         if(select > oneThird){
-                ret[0] = 1.;  ret[2] = 0.;  ret[4] = 0.;
-                ret[6] = 0.;  ret[8] = a;   ret[10] = c;
-                ret[12] = 0.; ret[14] = -c; ret[16] = a;
+                mPtr[0] = 1.;  mPtr[2] = 0.;  mPtr[4] = 0.;
+                mPtr[6] = 0.;  mPtr[8] = a;   mPtr[10] = c;
+                mPtr[12] = 0.; mPtr[14] = -c; mPtr[16] = a;
 
-                ret[1] = 1.;  ret[3] = 0.;  ret[5] = 0.;
-                ret[7] = 0.;  ret[9] = b;   ret[11] = d;
-                ret[13] = 0.; ret[15] = d;  ret[17] = -b;
+                mPtr[1] = 0.;  mPtr[3] = 0.;  mPtr[5] = 0.;
+                mPtr[7] = 0.;  mPtr[9] = b;   mPtr[11] = d;
+                mPtr[13] = 0.; mPtr[15] = d;  mPtr[17] = -b;
         }else{
-                ret[0] = a;   ret[2] = 0.;  ret[4] = c;
-                ret[6] = 0.;  ret[8] = 1.;  ret[10] = 0.;
-                ret[12] = -c; ret[14] = 0.; ret[16] = a;
+                mPtr[0] = a;   mPtr[2] = 0.;  mPtr[4] = c;
+                mPtr[6] = 0.;  mPtr[8] = 1.;  mPtr[10] = 0.;
+                mPtr[12] = -c; mPtr[14] = 0.; mPtr[16] = a;
 
-                ret[1] = b;   ret[3] = 0.;  ret[5] = d;
-                ret[7] = 0.;  ret[9] = 0.;  ret[11] = 0.;
-                ret[13] = d;  ret[15] = 0.; ret[17] = -b;
+                mPtr[1] = b;   mPtr[3] = 0.;  mPtr[5] = d;
+                mPtr[7] = 0.;  mPtr[9] = 0.;  mPtr[11] = 0.;
+                mPtr[13] = d;  mPtr[15] = 0.; mPtr[17] = -b;
         }
+
+	if(a * a + b * b + c * c + d * d > 1.01 || a * a + b * b + c * c + d * d < 0.99)
+	{
+		std::cout << "a = " << a << std::endl;
+		std::cout << "b = " << b << std::endl;
+		std::cout << "c = " << c << std::endl;
+		std::cout << "d = " << d << std::endl;
+	}
 
         return ret;
 }
@@ -98,6 +110,11 @@ private:
 	const char *cname;
 
 	gchbArg *gchbArg_;
+
+	long reject;
+	long accept;
+	long rejectCons;
+	long acceptCons;
 
 	inline bool isConstrained(int *x, int mu, int mag)
 	{
@@ -159,10 +176,12 @@ private:
 			if(dieRoll < acceptProbability){
 				VRB.Debug("ACCEPT\n\n");
 				U = mTemp1;
+				accept++;
 			}
-			else
+			else{
 				VRB.Debug("REJECT\n\n");
-
+				reject++;
+			}
 		}             /* End HIT_CNT loop for multiple hits.           */
 	}
 
@@ -191,6 +210,7 @@ private:
 		{
 			epsilon = getRandomSU3BySubsu2(gchbArg_->small);
 			epsilonDagger.Dagger(epsilon);
+
 
 			// Now begin the update process. 
 
@@ -226,14 +246,39 @@ private:
 				VRB.Debug("ACCEPT\n\n");
 				U1 = mTemp1;
 				U2 = mTemp2;
+				acceptCons++;
 			}
-			else
+			else{
 				VRB.Debug("REJECT\n\n");
+				rejectCons++;
+			}
 
 		}             /* End HIT_CNT loop for multiple hits.           */
 	}
 
 public:
+	inline void showInfo(){
+	
+		cout << "mag = " << gchbArg_->mag << endl;
+		cout << "numIter = " << gchbArg_->numIter << endl;
+		cout << "nHits = " << gchbArg_->nHits << endl;
+		cout << "small = " << gchbArg_->small << endl;
+		cout << "beta = " << GJP.Beta() << endl;
+		
+	}
+		
+	inline void accpetRate(){
+		cout << "Normal Metropolis: " 
+			<< (double)accept / (accept + reject)
+			<< endl;
+		cout << "Constrained Metropolis: " 
+			<< (double)acceptCons / (acceptCons + rejectCons)
+			<< endl;
+		cout << "Total: "
+			<< (double)(accept + acceptCons) / (accept + acceptCons + reject + rejectCons)
+			<< endl;
+	}
+
 	inline algGCtrnHeatBath(Lattice &lat, CommonArg *c_arg, gchbArg *arg)
 				: Alg(lat, c_arg){
 		
@@ -242,73 +287,71 @@ public:
   		VRB.Func(cname, fname);
   		if(arg == NULL) ERR.Pointer(cname, fname, "arg");
 		gchbArg_ = arg;
+
+		accept = 0;
+		reject = 0;
+		acceptCons = 0;
+		rejectCons = 0;
+		
 	}
 
 	inline virtual ~algGCtrnHeatBath(){}
 
 	inline void run()
 	{
-		TIMER("algGCtrnHeatBath::run()");
+		TIMER_VERBOSE("algGCtrnHeatBath::run()");
 
 		VRB.Func(cname,fname);
 
 		// Set the Lattice pointer
 		//----------------------------------------------------------------
 		Lattice& lat = AlgLattice();
-		if (lat.Gclass() != G_CLASS_WILSON){
-			ERR.General(cname, fname, \
-					"Only correct for Wilson gauge action\n");
-		}
-
-		// relocate the heatbath kernal and set up rand seeds
-		//--------------------------------------------------
+ 		if (lat.Gclass() != G_CLASS_WILSON){
+ 			ERR.General(cname, fname, \
+ 					"Only correct for Wilson gauge action\n");
+ 		}
 
 		// Run the gauge heat bath
 		//----------------------------------------------------------------
 		for(int i = 0; i < gchbArg_->numIter; i++){
-
-			// Heat bath
-			// Checkerboard everything, do even or odd sites
-			// Scan over local subvolume doing all even(odd) links
-			// index for "x" is consistant with GsiteOffset: "x,y,z,t" order
-
-			// The y[4] are the local coordinates for the 2^4 cube. 
-			// We traverse the points on this cube, and do the corresponding
-			// points on every other hypercube before moving on.
-
 			int x[4];
 			Matrix *mPtr = lat.GaugeField();
-			for(int mu = 0; mu < 4; mu++){
+			for(int mut = 0; mut < 4; mut++){
 			for(x[3] = 0; x[3] < GJP.TnodeSites(); x[3]++){ 
 			for(x[2] = 0; x[2] < GJP.ZnodeSites(); x[2]++){
 			for(x[1] = 0; x[1] < GJP.YnodeSites(); x[1]++){ 
 			for(x[0] = 0; x[0] < GJP.XnodeSites(); x[0]++){
+				
 				LRG.AssignGenerator(x);
-				if(isConstrained(x, mu, gchbArg_->mag)){
-					if(x[mu] % gchbArg_->mag == gchbArg_->mag - 1){}
+				
+				if(isConstrained(x, mut, gchbArg_->mag)){
+				if(x[mut] % gchbArg_->mag == gchbArg_->mag - 1){}
 					else{
 						int y[4]; memcpy(y, x, 4 * sizeof(int));
-						y[mu]++;
+						y[mut]++;
 						Matrix mStaple1, mStaple2;
-						lat.Staple(mStaple1, x, mu);
-						lat.Staple(mStaple2, y, mu);
+						lat.Staple(mStaple1, x, mut);
+						lat.Staple(mStaple2, y, mut);
 						metropolisKernelPProd(
-							mPtr[mu + lat.GsiteOffset(x)],
+							mPtr[mut + lat.GsiteOffset(x)],
 							mStaple1,
-							mPtr[mu + lat.GsiteOffset(y)],
+							mPtr[mut + lat.GsiteOffset(y)],
 							mStaple2
 							);
 					}
 				}else{
+
 					Matrix mStaple;
-					lat.Staple(mStaple, x, mu);
+					lat.Staple(mStaple, x, mut);
+					long localIndexCPS; 
+					GJP.localIndexFromPos(x, localIndexCPS);
 					metropolisKernel(
-						mPtr[mu + lat.GsiteOffset(x)],
+						mPtr[mut + 4 * localIndexCPS],
 						mStaple
 						);
 				}			
-			}}}}}
-			lat.Reunitarize();
+	 		}}}}}
+	 		lat.Reunitarize();
 		}
 	}
 };
