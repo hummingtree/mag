@@ -170,6 +170,7 @@ public:
 	int mag;
 	double beta;
 	Field<Matrix> *gField;
+	double dt;
 };
 
 class algCHmcWilson{
@@ -214,8 +215,59 @@ private:
 		force.TrLessAntiHermMatrix(mTemp);
 	}
 
-public:
+	inline void evolveMomemtum(double dt_){
+#pragma omp parallel for
+		for(long index = 0; index < arg->gField->geo.localVolume(); index++){
+			Coordinate x; 
+			arg->gField->geo.coordinateFromIndex(x, index);
+			Matrix mTemp;
+			for(int mu = 0; mu < arg->gField->geo.multiplicity; mu++){
+			// only works for cps::Matrix
+				getForce(mTemp, *(arg->gField), x, mu);
+				fField.getElems(x)[mu] += dt_ * mTemp;
+		}}
+	}
 
+	inline void evolveGaugeField(double dt_){
+#pragma omp parallel for
+		for(long index = 0; index < arg->gField->geo.localVolume(); index++){
+			Coordinate x; 
+			arg->gField->geo.coordinateFromIndex(x, index);
+			Matrix mTemp;
+			for(int mu = 0; mu < arg->gField->geo.multiplicity; mu++){
+			// only works for cps::Matrix
+				if(isConstrained(x, mu, arg->mag)){
+					Coordinate y(x); y[mu]--;
+					if(x[mu] % arg->mag == arg->mag - 1){
+						arg->gField.getElems(x)[mu] = \
+						exp(dt_ *fField.getElems(y)[mu]) * \
+						arg->gField.getElems(x)[mu];
+					}else if(x[mu] & arg->mag == 0){
+						arg->gField.getElems(x)[mu] = \
+						arg->gField.getElems(x)[mu] * \
+						exp(-dt_ * fField.getElems(x)[mu]);
+					}
+					else{
+						arg->gField.getElems(x)[mu] = \
+						exp(dt_ * fField.getElems(y)[mu]) * \
+						arg->gField.getElems(x)[mu] * \
+						exp(-dt_ * fField.getElems(x)[mu]);
+					}
+				}else{
+					arg->gField.getElems(x)[mu] = \
+					exp(dt_ * fField.getElems(x)[mu]) * \
+					arg->gField.getElems(x)[mu];
+				}
+		}}
+	}
+
+public:
+	inline algCHmcWilson(argCHmcWilson *arg_){
+		arg = arg_;
+		fField.init(arg->gField.geo);
+	}
+
+	inline void run(){}
 
 };
 
