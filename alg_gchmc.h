@@ -29,6 +29,9 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
+inline void getPathOrderedProd(Matrix &prod, Field<Matrix> &field, 
+					const Coordinate &x, vector<int> &dir);
+
 double avg_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
@@ -100,28 +103,39 @@ double check_constrained_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat,
 		Coordinate x(x0, x1, x2, x3);
 		for(int mu = 0; mu < DIM; mu++){
 		for(int nu = 0; nu < mu; nu++){
-			cps::Matrix mul; mul.UnitMatrix();
-			for(int i = 0; i < mag; i++){
-				mul = mul * gauge_field_qlat.getElems(x)[mu];
-				x = x + dir_vec[mu];
-			}
-			for(int i = 0; i < mag; i++){
-				mul = mul * gauge_field_qlat.getElems(x)[nu];
-				x = x + dir_vec[nu];
-			}
-			cps::Matrix dag;
-			for(int i = 0; i < mag; i++){
-				x = x - dir_vec[mu];
-				dag.Dagger(gauge_field_qlat.getElems(x)[mu]);
-				mul = mul * dag;
-			}
-			for(int i = 0; i < mag; i++){
-				x = x - dir_vec[nu];
-				dag.Dagger(gauge_field_qlat.getElems(x)[nu]);
-				mul = mul * dag;
-			}
+
+			Matrix mul, m;
+			vector<int> dir; dir.clear();
+			dir.push_back(mu); dir.push_back(nu);
+			dir.push_back(mu + DIM); dir.push_back(nu + DIM);
+			
+			getPathOrderedProd(m, gauge_field_qlat, x, dir);
+
 			count++;
 			node_sum += mul.ReTr();
+	
+	// 		cps::Matrix mul; mul.UnitMatrix();
+	// 		for(int i = 0; i < mag; i++){
+	// 			mul = mul * gauge_field_qlat.getElems(x)[mu];
+	// 			x = x + dir_vec[mu];
+	// 		}
+	// 		for(int i = 0; i < mag; i++){
+	// 			mul = mul * gauge_field_qlat.getElems(x)[nu];
+	// 			x = x + dir_vec[nu];
+	// 		}
+	// 		cps::Matrix dag;
+	// 		for(int i = 0; i < mag; i++){
+	// 			x = x - dir_vec[mu];
+	// 			dag.Dagger(gauge_field_qlat.getElems(x)[mu]);
+	// 			mul = mul * dag;
+	// 		}
+	// 		for(int i = 0; i < mag; i++){
+	// 			x = x - dir_vec[nu];
+	// 			dag.Dagger(gauge_field_qlat.getElems(x)[nu]);
+	// 			mul = mul * dag;
+	// 		}
+	// 		count++;
+	// 		node_sum += mul.ReTr();
 		}}
 	}}}}
 
@@ -131,36 +145,48 @@ double check_constrained_plaquette(qlat::Field<cps::Matrix> &gauge_field_qlat,
 	return global_sum / (3. * count * getNumNode());
 }
 
+inline void exp(Matrix &expM, const Matrix &M){
+        Matrix mTemp2 = M, mTemp3;
+	for(int i = 9; i > 1; i--){
+		mTemp3.OneMinusfTimesM(-1./i, mTemp2);
+		mTemp2.DotMEqual(M, mTemp3);
+	}
+	expM.OneMinusfTimesM(-1., mTemp2);
+}
+
 inline void getPathOrderedProd(Matrix &prod, Field<Matrix> &field, 
-				const Coordinate &x, vector<int> &dir){
+					const Coordinate &x, vector<int> &dir){
 	Matrix mul; mul.UnitMatrix();
 	Matrix dag;
 	Coordinate y(x);
-	for(vector::iterator it = dir.begin(); it != dir.end(); it++){
+	for(vector<int>::iterator it = dir.begin(); it != dir.end(); it++){
 		assert(*it < DIM * 2 && *it > -1);
 		if(*it < DIM && *it > -1){
-			mul = mul * field.getElemsConst(y)[*it];
+			mul.DotMEqual(mul, field.getElemsConst(y)[*it]);
 			y[*it]++;
 		}else{
 			y[*it - DIM]--;
 			dag.Dagger(field.getElemsConst(y)[*it - DIM]);
-			mul = mul * dag;
+			mul.DotMEqual(mul, dag);
 		}
 	}
 	prod = mul;
 }
 
 inline void getStaple(Matrix &staple, Field<Matrix> &field, 
-				const Coordinate &x, const int mu){
+					const Coordinate &x, const int mu){
 	vector<int> dir; dir.clear();
 	Matrix staple_; staple.ZeroMatrix();
+	Matrix m;
 	for(int nu = 0; nu < DIM; nu++){
 		if(mu == nu) continue;
 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
-		staple_ = staple_ + getPathOrderedProd(field, x, dir);
+		getPathOrderedProd(m, field, x, dir);
+		staple_ += m;
 		dir.clear();
 		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
-		staple_ = staple_ + getPathOrderedProd(filed, x, dir);
+		getPathOrderedProd(m, field, x, dir);
+		staple_ += m;
 	}
 	staple = staple_;
 }
@@ -177,7 +203,7 @@ class algCHmcWilson{
 private:
 	
 	argCHmcWilson *arg;
-	Field<Matrix> fField;
+	Field<Matrix> mField;
 
 	inline bool isConstrained(const Coordinate &x, int mu, int mag)
 	{
@@ -201,15 +227,15 @@ private:
 				getStaple(mStaple2, *(arg->gField), y, mu);
 				dagger1.Dagger(mStaple1); 
 				dagger2.Dagger(mStaple2);
-				mTemp1 = arg->gField.getElemsConst(x)[mu];
-				mTemp2 = arg->gField.getElemsConst(y)[mu];
+				mTemp1 = arg->gField->getElemsConst(x)[mu];
+				mTemp2 = arg->gField->getElemsConst(y)[mu];
 				mTemp = dagger1 * mTemp1 - mTemp2 * dagger2;
 			}
 		}else{
 			getStaple(mStaple1, *(arg->gField), x, mu);
 			dagger1.Dagger(mStaple1); 
-			mTemp1 = arg->gField.getElemsConst(x)[mu];
-			mTemp = -mTemp1 * dagger1;
+			mTemp1 = arg->gField->getElemsConst(x)[mu];
+			mTemp = mTemp1 * dagger1 * -1.;
 		}
 		mTemp *= arg->beta / 3.; 
 		force.TrLessAntiHermMatrix(mTemp);
@@ -224,7 +250,7 @@ private:
 			for(int mu = 0; mu < arg->gField->geo.multiplicity; mu++){
 			// only works for cps::Matrix
 				getForce(mTemp, *(arg->gField), x, mu);
-				fField.getElems(x)[mu] += dt_ * mTemp;
+				mField.getElems(x)[mu] += dt_ * mTemp;
 		}}
 	}
 
@@ -234,29 +260,42 @@ private:
 			Coordinate x; 
 			arg->gField->geo.coordinateFromIndex(x, index);
 			Matrix mTemp;
+			Matrix mLeft, mRight;
 			for(int mu = 0; mu < arg->gField->geo.multiplicity; mu++){
 			// only works for cps::Matrix
 				if(isConstrained(x, mu, arg->mag)){
 					Coordinate y(x); y[mu]--;
 					if(x[mu] % arg->mag == arg->mag - 1){
-						arg->gField.getElems(x)[mu] = \
-						exp(dt_ *fField.getElems(y)[mu]) * \
-						arg->gField.getElems(x)[mu];
+					exp(mLeft, mField.getElems(y)[mu] * dt_);
+						arg->gField.getElems(x)[mu].DotMEqual(
+							mLeft,
+							arg->gField.getElems(x)[mu]
+						);	
 					}else if(x[mu] & arg->mag == 0){
-						arg->gField.getElems(x)[mu] = \
-						arg->gField.getElems(x)[mu] * \
-						exp(-dt_ * fField.getElems(x)[mu]);
+					exp(mRight, mField.getElems(x)[mu] * -dt_);
+						arg->gField.getElems(x)[mu].DotMEqual(
+							arg->gField.getElems(x)[mu],
+							mRight
+						);
 					}
 					else{
-						arg->gField.getElems(x)[mu] = \
-						exp(dt_ * fField.getElems(y)[mu]) * \
-						arg->gField.getElems(x)[mu] * \
-						exp(-dt_ * fField.getElems(x)[mu]);
+					exp(mLeft, mField.getElems(y)[mu] * dt_);
+					exp(mRight, mField.getElems(x)[mu] * -dt_);
+						arg->gField.getElems(x)[mu].DotEqual(
+							mLeft,
+							arg->gField.getElems(x)[mu]
+						);
+						arg->gField.getElems(x)[mu].DotEqual(
+							arg->gField.getElems(x)[mu]
+							mRight,
+						);
 					}
 				}else{
-					arg->gField.getElems(x)[mu] = \
-					exp(dt_ * fField.getElems(x)[mu]) * \
-					arg->gField.getElems(x)[mu];
+					exp(mLeft, mField.getElems(x)[mu] * dt_);
+					arg->gField.getElems(x)[mu].DotMEqual(
+							mLeft,
+							arg->gField.getElems(x)[mu]
+						);
 				}
 		}}
 	}
@@ -264,7 +303,7 @@ private:
 public:
 	inline algCHmcWilson(argCHmcWilson *arg_){
 		arg = arg_;
-		fField.init(arg->gField.geo);
+		mField.init(arg->gField.geo);
 	}
 
 	inline void run(){}

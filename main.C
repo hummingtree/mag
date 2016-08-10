@@ -32,8 +32,9 @@
 #include <qlat/field-io.h>
 #include <qlat/field-comm.h>
 
-#include "cps_util.h"
+#include "alg_gchmc.h"
 #include "alg_gchb.h"
+#include "cps_util.h"
 
 // #include<qmp.h>
 // #include<mpi.h>
@@ -132,9 +133,9 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	// cout << avg_real_trace(gauge_field_qlat) << endl;
 	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 
-	Field<MatrixTruncatedSU3> gauge_field_truncated;
-	fieldCastTruncated(gauge_field_truncated, gauge_field_qlat);
-	sophisticated_serial_write(gauge_field_truncated, export_addr, false, true);
+//	Field<MatrixTruncatedSU3> gauge_field_truncated;
+//	fieldCastTruncated(gauge_field_truncated, gauge_field_qlat);
+//	sophisticated_serial_write(gauge_field_truncated, export_addr, false, true);
 
  	// if(mag == 1) load_config(export_addr);
 // 
@@ -298,8 +299,8 @@ int main(int argc, char* argv[]){
 			"ckpoint_lat.300_mag" + show((long)mag_factor);
 	
 	// if(!doesFileExist(expanded_config.c_str())){
-	//	CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
-	//	return 0;
+		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
+		return 0;
 	// }
 
 	File2QLAT2CPS(totalSize, mag_factor, cps_config, argc, argv);
