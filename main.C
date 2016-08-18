@@ -31,6 +31,7 @@
 #include <qlat/field.h>
 #include <qlat/field-io.h>
 #include <qlat/field-comm.h>
+#include <qlat/field-rng.h>
 
 #include "alg_gchmc.h"
 #include "alg_gchb.h"
@@ -132,6 +133,20 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	// cout << avg_plaquette(gauge_field_qlat) << endl;
 	// cout << avg_real_trace(gauge_field_qlat) << endl;
 	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
+
+	// HMC in qlat ------------------- start -------------------
+	
+	argCHmcWilson argHMC;
+	argHMC.mag = mag;
+	argHMC.length = 5;
+	argHMC.beta = 2.13;
+	argHMC.dt = 0.1;
+	argHMC.gFieldExt = &gauge_field_qlat;
+	
+	algCHmcWilson algHMC(argHMC);
+	algHMC.runTraj();
+
+	// HMC in qlat -------------------- end --------------------
 
 //	Field<MatrixTruncatedSU3> gauge_field_truncated;
 //	fieldCastTruncated(gauge_field_truncated, gauge_field_qlat);
@@ -300,6 +315,7 @@ int main(int argc, char* argv[]){
 	
 	// if(!doesFileExist(expanded_config.c_str())){
 		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
+		if(UniqueID() == 0) cout << "Program ended normally." << endl;
 		return 0;
 	// }
 
