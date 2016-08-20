@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -121,4 +123,19 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
         return global_sum / (3. * count * NumNodes());
 }
 
+template<class CharT, class Traits>
+std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os,
+                   const cps::Matrix &M){
+        std::basic_ostringstream<CharT, Traits> os_;
+        os_.flags(os.flags());
+        os_.imbue(os.getloc());
+        os_.precision(4);
+        os_.setf(std::ios::showpoint);
+        os_.setf(std::ios::showpos);
+        os_.setf(std::ios::scientific);
+        os_ << "|" << M(0, 0) << " " << M(0, 1) << " " << M(0, 2) << "|" << endl;
+        os_ << "|" << M(1, 0) << " " << M(1, 1) << " " << M(1, 2) << "|" << endl;
+        os_ << "|" << M(2, 0) << " " << M(2, 1) << " " << M(2, 2) << "|" << endl;
+        return os << os_.str();
+}
 

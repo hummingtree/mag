@@ -25,53 +25,60 @@
 #include <qlat/field-io.h>
 #include <qlat/field-comm.h>
 
+#include "cps_util.h"
+
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
 #define SU3_NUM_OF_GENERATORS 8
 
+
 inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir);
 		// forward declearation
+
+static const double invSqrt2 = 1. / sqrt(2.);
+static const double xi = 0.1931833;
 
 inline vector<Matrix> initGenerator(){
 	Matrix T1, T2, T3, T4, T5, T6, T7, T8;
 	// the eight Hermitian generators of SU3	
 	T1.ZeroMatrix();
 	T1(0, 1) = qlat::Complex(1., 0.);  T1(1, 0) = qlat::Complex(1., 0.);
-	T1 *= 0.5;
+	T1 *= invSqrt2;
 
 	T2.ZeroMatrix();
 	T2(0, 1) = qlat::Complex(0., -1.); T2(1, 0) = qlat::Complex(0., 1.);
-	T2 *= 0.5;
+	T2 *= invSqrt2;
 
 	T3.ZeroMatrix();
 	T3(0, 0) = qlat::Complex(1., 0.);  T3(1, 1) = qlat::Complex(-1., 0.);
-	T3 *= 0.5;
+	T3 *= invSqrt2;
 
 	T4.ZeroMatrix();
 	T4(0, 2) = qlat::Complex(1., 0.);  T4(2, 0) = qlat::Complex(1., 0.);
-	T4 *= 0.5;
+	T4 *= invSqrt2;
 
 	T5.ZeroMatrix();
 	T5(0, 2) = qlat::Complex(0., -1.); T5(2, 0) = qlat::Complex(0., 1.);
-	T5 *= 0.5;
+	T5 *= invSqrt2;
 
 	T6.ZeroMatrix();
 	T6(1, 2) = qlat::Complex(1., 0.);  T6(2, 1) = qlat::Complex(1., 0.);
-	T6 *= 0.5;
+	T6 *= invSqrt2;
 
 	T7.ZeroMatrix();
 	T7(1, 2) = qlat::Complex(0., -1.); T7(2, 1) = qlat::Complex(0., 1.);
-	T7 *= 0.5;
+	T7 *= invSqrt2;
 
 	T8.ZeroMatrix();
 	T8(0 ,0) = qlat::Complex(1., 0.);  T8(1, 1) = qlat::Complex(1., 0.); 
 	T8(2, 2) = qlat::Complex(-2., 0.);
-	T8 *= 1. / sqrt(12.);
+	T8 *= 1. / sqrt(6.);
 	
 	vector<Matrix> ret {T1, T2, T3, T4, T5, T6, T7, T8};
+	
 	return ret;
 }
 
@@ -148,7 +155,7 @@ inline double totalPlaq(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 	double global_sum;
 	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
 
-	return global_sum / 3.;
+	return global_sum;
 }
 
 inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
@@ -210,7 +217,7 @@ inline double check_constrained_plaquette(
 inline void exp(Matrix &expM, const Matrix &M){
         Matrix mTemp2 = M, mTemp3;
 	for(int i = 9; i > 1; i--){
-		mTemp3.OneMinusfTimesM(-1./i, mTemp2);
+		mTemp3.OneMinusfTimesM(-1. / i, mTemp2);
 		mTemp2.DotMEqual(M, mTemp3);
 	}
 	expM.OneMinusfTimesM(-1., mTemp2);
@@ -245,11 +252,12 @@ inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field,
 
 inline void getStaple(Matrix &staple, const Field<Matrix> &field, 
 					const Coordinate &x, const int mu){
-	vector<int> dir; dir.clear();
-	Matrix staple_; staple.ZeroMatrix();
+	vector<int> dir;
+	Matrix staple_; staple_.ZeroMatrix();
 	Matrix m;
 	for(int nu = 0; nu < DIM; nu++){
 		if(mu == nu) continue;
+		dir.clear();
 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
 		getPathOrderedProd(m, field, x, dir);
 		staple_ += m;
@@ -261,16 +269,35 @@ inline void getStaple(Matrix &staple, const Field<Matrix> &field,
 	staple = staple_;
 }
 
+inline double avg_plaquette_test(const qlat::Field<cps::Matrix> &gauge_field_qlat){
+	qlat::Geometry geo_ = gauge_field_qlat.geo;
+
+	double node_sum = 0.;
+	Matrix mStaple, mDagger; 	
+	for(long index = 0; index < geo_.localVolume(); index++){
+		 Coordinate x; geo_.coordinateFromIndex(x, index);
+		 for(int mu = 0; mu < DIM; mu++){
+			getStaple(mStaple, gauge_field_qlat, x, mu);
+			mDagger.Dagger(mStaple);
+			node_sum += \
+			(gauge_field_qlat.getElemsConst(x)[mu] * mDagger).ReTr();
+		 }
+	}
+	double global_sum;
+	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+
+	return global_sum / (4. * 18. * getNumNode() * geo_.localVolume());
+}
+
 inline void rnFillingSHA256Gaussian(std::vector<double> &xs)
 {
 	using namespace qlat;
 	static bool initialized = false;
 	static const int numSite = 256;
-	static const Coordinate totalSite(1, 1, 1, numSite);
 	static Geometry geo;
 	static qlat::RngField rf;
 	if (false == initialized){
-		geo.init(totalSite, 1);
+		geo.init(getSizeNode(), 1);
 		rf.init(geo, RngState("Ich liebe dich."));
 		initialized = true;
 	}
@@ -296,6 +323,7 @@ public:
 
 	const argCHmcWilson& operator=(const argCHmcWilson &RHS){
 		this->mag = RHS.mag;
+		this->length = RHS.length;
 		this->beta = RHS.beta;
 		this->dt = RHS.dt;
 		this->gFieldExt = RHS.gFieldExt;
@@ -319,6 +347,13 @@ private:
 		// on the segment
 		// return 10: constrained and the first one on the segment
 		// return 100: constrained and the last one on the segment
+		
+		// debug start
+		
+		return 0;
+
+		// debug end
+
 		bool isConstrained_ = true;
 		for(int i = 0; i < 4; i++){
 			if(i == mu) continue;
@@ -361,20 +396,30 @@ private:
 			default: assert(false);
 		}
 		
-		mTemp *= arg.beta / 3.; 
-		force.TrLessAntiHermMatrix(mTemp); force *= qlat::Complex(0., 1.);
+		mTemp.TrLessAntiHermMatrix(); 
+		mTemp *= qlat::Complex(0., arg.beta / 3.);
+		force = mTemp;
 	}
 
 	inline void evolveMomemtum(double dt_){
 #pragma omp parallel for
-		for(long index = 0; index < gField.geo.localVolume(); index++){
+		for(long index = 0; index < mField.geo.localVolume(); index++){
 			Coordinate x; 
-			gField.geo.coordinateFromIndex(x, index);
-			Matrix mTemp;
+			mField.geo.coordinateFromIndex(x, index);
+			Matrix mForce;
 			for(int mu = 0; mu < gField.geo.multiplicity; mu++){
 			// only works for cps::Matrix
-				getForce(mTemp, x, mu);
-				mField.getElems(x)[mu] += mTemp * dt_;
+				getForce(mForce, x, mu);
+		// 		if(getIdNode() == 0){
+		// 			cout << "Before: " << endl;
+		// 			cout << mField.getElems(x)[mu] << endl;
+		// 		}
+				mField.getElems(x)[mu] += mForce * dt_;
+		// 		if(getIdNode() == 0){
+		// 			cout << "After: " << endl;
+		// 			cout << mField.getElems(x)[mu] << endl;
+		// 		}
+
 		}}
 	}
 
@@ -392,7 +437,7 @@ private:
 				switch(isConstrained(x, mu, arg.mag)){
 				case 0: {
 					LieA2LieG(mLeft, mField.getElems(x)[mu] * dt_);
-					U = mLeft * U;
+					gField.getElems(x)[mu] = mLeft * gField.getElems(x)[mu];
 					break;
 				}
 				case 1: {
@@ -409,7 +454,7 @@ private:
 					break;
 				}
 				case 100: {
-					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
+					LieA2LieG(mLeft, mField.getElems(x)[mu] * dt_);
 					U = mLeft * U;
 					break;
 				}
@@ -419,29 +464,46 @@ private:
 	}
 
 	inline double getHamiltonian(){
+		static double oldKE = 0., oldPE = 0., oldTotalE = 0.;
 		double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
-#pragma omp parallel for reduction(+:localSum)
-		for(long index = 0; index < gField.geo.localVolume(); index++){
+// #pragma omp parallel for reduction(+:localSum)
+		for(long index = 0; index < mField.geo.localVolume(); index++){
 			for(int mu = 0; mu < DIM; mu++){
 				Coordinate x; 
-				gField.geo.coordinateFromIndex(x, index);
+				mField.geo.coordinateFromIndex(x, index);
 				switch(isConstrained(x, mu, arg.mag)){
 					case 100: break;
 					case 0:
 					case 1:
 					case 10:{
 						Matrix mTemp = \
-						gField.getElemsConst(x)[mu];
-						mTemp = mTemp * mTemp;
-						localSum += mTemp.ReTr();
+							mField.getElemsConst(x)[mu];
+						localSum += (mTemp * mTemp).ReTr();
 						break;
 					}
 					default: assert(false);
 				}
 		}}
 		double globalSum;
-		MPI_Allreduce(&globalSum, &localSum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-		return globalSum / 2. + totalPlaq(gField) * arg.beta / 3.;
+		MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+		double kineticEnergy = globalSum / 2.;
+		double potentialEnergy = -totalPlaq(gField) * arg.beta / 3.;
+		if(getIdNode() == 0){
+	// 		cout << "kinEng = \t" << kineticEnergy << endl;
+	// 		cout << "potEng = \t" << potentialEnergy << endl;
+	// 		cout << "totEng = \t" 
+	// 			<< kineticEnergy + potentialEnergy << endl;
+	// 		cout << "delKin = \t" << kineticEnergy - oldKE << endl;
+	//		cout << "delPot = \t" << potentialEnergy - oldPE << endl;
+			// cout << "ratio = " << (kineticEnergy - oldKE) / (potentialEnergy - oldPE) << endl;
+	//		cout << "delPer = \t" << (kineticEnergy + potentialEnergy - oldTotalE) / oldTotalE << endl;
+		}
+
+		oldKE = kineticEnergy;
+		oldPE = potentialEnergy;
+		oldTotalE = kineticEnergy + potentialEnergy;
+
+		return kineticEnergy + potentialEnergy;
 	}
 
 public:
@@ -449,14 +511,14 @@ public:
 		globalRngState("By the witness of the martyrs.")
 	{
 		arg = arg_;
-		qlat::Geometry geo_ = gField.geo;
+		qlat::Geometry geo_ = arg.gFieldExt->geo;
 		
 		assert(geo_.expansionLeft[0] > 0 && geo_.expansionRight[0] > 0);
 		assert(geo_.expansionLeft[1] > 0 && geo_.expansionRight[1] > 0);
 		assert(geo_.expansionLeft[2] > 0 && geo_.expansionRight[2] > 0);
 		assert(geo_.expansionLeft[3] > 0 && geo_.expansionRight[3] > 0);
 	
-		gField.init(arg.gFieldExt->geo); gField = *(arg.gFieldExt);
+		gField.init(geo_); gField = *(arg.gFieldExt);
 		mField.init(gField.geo);
 	}
 
@@ -485,28 +547,70 @@ public:
 		initMomentum();
 		fetch_expanded(gField);
 		double oldH = getHamiltonian();
-		evolveMomemtum(arg.dt / 2.);
 		for(int i = 0; i < arg.length; i++){
-			evolveGaugeField(arg.dt);
+
+			evolveGaugeField(arg.dt / 2.);
 			fetch_expanded(gField);
+
 			evolveMomemtum(arg.dt);
+
+			evolveGaugeField(arg.dt / 2.);
+			fetch_expanded(gField);
+
+		// 	evolveGaugeField(xi * arg.dt);
+		// 	fetch_expanded(gField);
+		// 	
+		// 	evolveMomemtum(arg.dt / 2.);
+
+		// 	evolveGaugeField((1 - 2. * xi) * arg.dt);
+		// 	fetch_expanded(gField);
+
+		// 	evolveMomemtum(arg.dt / 2.);
+		// 	
+		// 	evolveGaugeField(xi * arg.dt);
+		// 	fetch_expanded(gField);
+			
+			
+			// fetch_expanded(gField);
+			double avgPlaq = avg_plaquette(gField);
+			if(getIdNode() == 0){
+				cout << "(literal)Step " << i << ": avgPlaq = "
+					<< avgPlaq << endl;
+			}
+	// 		if(getIdNode() == 0)
+	// 			cout << "(literal)Step after " << i << endl;
+	// 		getHamiltonian();
+
 		}
 		double newH = getHamiltonian();
-		
-		bool doesAccept = uRandGen(globalRngState) < exp(oldH - newH);
+		double dieRoll = uRandGen(globalRngState);
+		double deltaH = newH - oldH;
+		double percentDeltaH = deltaH / oldH;
+		double acceptProbability = exp(oldH - newH);
+		bool doesAccept = (dieRoll < acceptProbability);
 		MPI_Bcast((void *)&doesAccept, 1, MPI_BYTE, 0, getComm());
 		// make sure that all the node make the same decision.
 		if(doesAccept){
-			cout << "accept traj." << endl;
-			cout << "old Hamiltonian = " << oldH << endl;
-			cout << "new Hamiltonian = " << newH << endl;
-			cout << "exp(DeltaH) = " << exp(oldH - newH) << endl;
+			if(getIdNode() == 0){
+				cout << "End traj: accept traj." << endl;
+				cout << "old Hamiltonian =\t" << oldH << endl;
+				cout << "new Hamiltonian =\t" << newH << endl;
+				cout << "exp(DeltaH) =\t" << exp(oldH - newH) << endl;
+				cout << "Die Roll =\t" << dieRoll << endl; 
+				cout << "deltaH =\t" << deltaH << endl; 
+				cout << "percentDeltaH =\t" << percentDeltaH << endl; 
+			}
 			*(arg.gFieldExt) = gField;
 		}else{
-			cout << "reject traj." << endl;
-			cout << "old Hamiltonian = " << oldH << endl;
-			cout << "new Hamiltonian = " << newH << endl;
-			cout << "exp(DeltaH) = " << exp(oldH - newH) << endl;
+			if(getIdNode() == 0){
+				cout << "End traj: reject traj." << endl;
+				cout << "old Hamiltonian = " << oldH << endl;
+				cout << "new Hamiltonian = " << newH << endl;
+				cout << "exp(DeltaH) = " << exp(oldH - newH) << endl;
+				cout << "Die Roll =\t" << dieRoll << endl; 
+				cout << "deltaH =\t" << deltaH << endl; 
+				cout << "percentDeltaH =\t" << percentDeltaH << endl; 
+			}
 			gField = *(arg.gFieldExt);
 		}
 

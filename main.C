@@ -49,6 +49,7 @@ using namespace qlat;
 void naive_field_expansion(const cps::Lattice &lat, 
 			qlat::Field<cps::Matrix> &gauge_field_qlat, int mag)
 {
+	// from CPS to qlat
 	syncNode();
 #pragma omp parallel for
 	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
@@ -85,7 +86,8 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	GJP.Initialize(do_arg_coarse);
 	LRG.Initialize();
 
-	load_config(config_addr.c_str());
+	// load config in CPS
+	// load_config(config_addr.c_str());
 
 	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_NONE);
 
@@ -125,27 +127,33 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			 << "\tqlat: getIdNode(): " << getIdNode() << "; "
 				<< show(coorNode) << "." << std::endl;
 
-	naive_field_expansion(lat, gauge_field_qlat, mag);
+	// expand field from CPS to qlat
+	// naive_field_expansion(lat, gauge_field_qlat, mag);
  	LatticeFactory::Destroy();
 
 	fetch_expanded(gauge_field_qlat);
 
 	// cout << avg_plaquette(gauge_field_qlat) << endl;
+	// cout << avg_plaquette_test(gauge_field_qlat) << endl;
+	
 	// cout << avg_real_trace(gauge_field_qlat) << endl;
-	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
+	// cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 
 	// HMC in qlat ------------------- start -------------------
-	
+
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
-	argHMC.length = 5;
+	argHMC.length = 10;
 	argHMC.beta = 2.13;
-	argHMC.dt = 0.1;
+	argHMC.dt = 0.01;
 	argHMC.gFieldExt = &gauge_field_qlat;
 	
 	algCHmcWilson algHMC(argHMC);
-	algHMC.runTraj();
+	for(int i = 0; i < 20; i++){
+		algHMC.runTraj();
+	}
 
+	// cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 	// HMC in qlat -------------------- end --------------------
 
 //	Field<MatrixTruncatedSU3> gauge_field_truncated;
@@ -251,7 +259,6 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 
 	double avgPlaq, avgConsPlaq;
 
-	cout.precision(16);
 	
 	avgPlaq = lat.SumReTrPlaq() / (18. * GJP.VolSites());
 	avgConsPlaq = check_constrained_plaquette(lat, mag);
@@ -312,7 +319,11 @@ int main(int argc, char* argv[]){
 	string expanded_config = "/bgusr/home/jtu/config/"
 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 			"ckpoint_lat.300_mag" + show((long)mag_factor);
-	
+
+	cout.precision(12);
+	cout.setf(ios::showpoint);
+	cout.setf(ios::showpos);
+	cout.setf(ios::scientific);
 	// if(!doesFileExist(expanded_config.c_str())){
 		CPS2QLAT2File(totalSize, mag_factor, cps_config, expanded_config, argc, argv);
 		if(UniqueID() == 0) cout << "Program ended normally." << endl;
