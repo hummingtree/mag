@@ -293,7 +293,6 @@ inline void rnFillingSHA256Gaussian(std::vector<double> &xs)
 {
 	using namespace qlat;
 	static bool initialized = false;
-	static const int numSite = 256;
 	static Geometry geo;
 	static qlat::RngField rf;
 	if (false == initialized){
@@ -350,7 +349,7 @@ private:
 		
 		// debug start
 		
-		return 0;
+		// return 0;
 
 		// debug end
 
@@ -454,7 +453,7 @@ private:
 					break;
 				}
 				case 100: {
-					LieA2LieG(mLeft, mField.getElems(x)[mu] * dt_);
+					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
 					U = mLeft * U;
 					break;
 				}
@@ -466,7 +465,7 @@ private:
 	inline double getHamiltonian(){
 		static double oldKE = 0., oldPE = 0., oldTotalE = 0.;
 		double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
-// #pragma omp parallel for reduction(+:localSum)
+#pragma omp parallel for reduction(+:localSum)
 		for(long index = 0; index < mField.geo.localVolume(); index++){
 			for(int mu = 0; mu < DIM; mu++){
 				Coordinate x; 
@@ -543,7 +542,7 @@ public:
 		}}
 	}
 
-	inline void runTraj(){
+	inline void runTraj(int trajNum){
 		initMomentum();
 		fetch_expanded(gField);
 		double oldH = getHamiltonian();
@@ -574,14 +573,16 @@ public:
 			// fetch_expanded(gField);
 			double avgPlaq = avg_plaquette(gField);
 			if(getIdNode() == 0){
-				cout << "(literal)Step " << i << ": avgPlaq = "
-					<< avgPlaq << endl;
+				cout << "Traj #" << trajNum + 1 
+					<<  ", (literal)Step " << i + 1 
+					<< ":\tavgPlaq = " << avgPlaq << endl;
 			}
 	// 		if(getIdNode() == 0)
 	// 			cout << "(literal)Step after " << i << endl;
 	// 		getHamiltonian();
 
 		}
+		
 		double newH = getHamiltonian();
 		double dieRoll = uRandGen(globalRngState);
 		double deltaH = newH - oldH;
@@ -592,24 +593,28 @@ public:
 		// make sure that all the node make the same decision.
 		if(doesAccept){
 			if(getIdNode() == 0){
-				cout << "End traj: accept traj." << endl;
+				cout << "End trajectory " << trajNum + 1
+						<< ": ACCEPT trajectory." << endl;
 				cout << "old Hamiltonian =\t" << oldH << endl;
 				cout << "new Hamiltonian =\t" << newH << endl;
-				cout << "exp(DeltaH) =\t" << exp(oldH - newH) << endl;
-				cout << "Die Roll =\t" << dieRoll << endl; 
-				cout << "deltaH =\t" << deltaH << endl; 
-				cout << "percentDeltaH =\t" << percentDeltaH << endl; 
+				cout << "exp(-Delta H) =  \t" 
+							<< exp(oldH - newH) << endl;
+				cout << "Die Roll =       \t" << dieRoll << endl; 
+				cout << "Delta H =        \t" << deltaH << endl; 
+				cout << "Delta H Ratio =  \t" << percentDeltaH << endl; 
 			}
 			*(arg.gFieldExt) = gField;
 		}else{
 			if(getIdNode() == 0){
-				cout << "End traj: reject traj." << endl;
-				cout << "old Hamiltonian = " << oldH << endl;
-				cout << "new Hamiltonian = " << newH << endl;
-				cout << "exp(DeltaH) = " << exp(oldH - newH) << endl;
-				cout << "Die Roll =\t" << dieRoll << endl; 
-				cout << "deltaH =\t" << deltaH << endl; 
-				cout << "percentDeltaH =\t" << percentDeltaH << endl; 
+					cout << "End trajectory " << trajNum + 1
+						<< ": REJECT trajectory." << endl;
+				cout << "old Hamiltonian =\t" << oldH << endl;
+				cout << "new Hamiltonian =\t" << newH << endl;
+				cout << "exp(-Delta H) =  \t" 
+							<< exp(oldH - newH) << endl;
+				cout << "Die Roll =       \t" << dieRoll << endl; 
+				cout << "Delta H =        \t" << deltaH << endl; 
+				cout << "Delta H Ratio =  \t" << percentDeltaH << endl; 
 			}
 			gField = *(arg.gFieldExt);
 		}

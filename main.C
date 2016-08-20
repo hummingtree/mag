@@ -101,7 +101,7 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
         Geometry geo_;
         geo_.init(totalSite_qlat, DIM);
 	// expand geometry to test the communication.
-	Coordinate expansion(2, 2, 2, 2);
+	Coordinate expansion(1, 1, 1, 1);
 	geo_.resize(expansion, expansion);
 
 	qlat::Field<cps::Matrix> gauge_field_qlat;
@@ -137,23 +137,23 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	// cout << avg_plaquette_test(gauge_field_qlat) << endl;
 	
 	// cout << avg_real_trace(gauge_field_qlat) << endl;
-	// cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
+	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 
 	// HMC in qlat ------------------- start -------------------
 
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
-	argHMC.length = 10;
-	argHMC.beta = 2.13;
-	argHMC.dt = 0.01;
+	argHMC.length = 30;
+	argHMC.beta = 6.05;
+	argHMC.dt = 0.025;
 	argHMC.gFieldExt = &gauge_field_qlat;
 	
 	algCHmcWilson algHMC(argHMC);
-	for(int i = 0; i < 20; i++){
-		algHMC.runTraj();
+	for(int i = 0; i < 50; i++){
+		algHMC.runTraj(i);
 	}
 
-	// cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
+	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 	// HMC in qlat -------------------- end --------------------
 
 //	Field<MatrixTruncatedSU3> gauge_field_truncated;
@@ -307,7 +307,7 @@ bool doesFileExist(const char *fn){
 
 int main(int argc, char* argv[]){
 	
-	Coordinate totalSize(24, 24, 24, 64);
+	Coordinate totalSize(8, 8, 8, 16);
 	int mag_factor = 2;
 	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/"
 		"b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
