@@ -87,7 +87,7 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	LRG.Initialize();
 
 	// load config in CPS
-	// load_config(config_addr.c_str());
+	load_config(config_addr.c_str());
 
 	Lattice &lat = LatticeFactory::Create(F_CLASS_NONE, G_CLASS_NONE);
 
@@ -128,7 +128,7 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 				<< show(coorNode) << "." << std::endl;
 
 	// expand field from CPS to qlat
-	// naive_field_expansion(lat, gauge_field_qlat, mag);
+	naive_field_expansion(lat, gauge_field_qlat, mag);
  	LatticeFactory::Destroy();
 
 	fetch_expanded(gauge_field_qlat);
@@ -141,16 +141,37 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 
 	// HMC in qlat ------------------- start -------------------
 
+	FILE *resultFile = NULL;	
+	
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
 	argHMC.length = 30;
 	argHMC.beta = 6.05;
-	argHMC.dt = 0.025;
+	argHMC.dt = 0.0175;
 	argHMC.gFieldExt = &gauge_field_qlat;
-	
+	int numTraj = 500;
+
+	if(getIdNode() == 0){
+		resultFile = fopen((export_addr + "_HMC_traj_info.dat").c_str(), "w");
+		assert(resultFile != NULL);
+		time_t now = time(NULL);
+		fputs("# ", resultFile);
+		fputs(ctime(&now), resultFile);
+		fprintf(resultFile, "# mag =        %i\n", argHMC.mag);
+		fprintf(resultFile, "# trajLength = %i\n", argHMC.length);
+		fprintf(resultFile, "# numTraj =    %i\n", numTraj);
+		fprintf(resultFile, "# beta =       %.3f\n", argHMC.beta);
+		fprintf(resultFile, "# dt =         %.5f\n", argHMC.dt);
+		fprintf(resultFile, "# traj#\texp(-DeltaH)\tavgPlaq\tA/R\n");
+		cout << "resultFile opened." << endl;
+	}
+		
 	algCHmcWilson algHMC(argHMC);
-	for(int i = 0; i < 50; i++){
+	for(int i = 0; i < numTraj; i++){
 		algHMC.runTraj(i);
+		if(getIdNode() == 0) fprintf(resultFile, "%i\t%.6e\t%.6e\t%i\n", \
+			i + 1, algHMC.acceptProbability, algHMC.avgPlaq, \
+			algHMC.doesAccept);
 	}
 
 	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
@@ -307,8 +328,8 @@ bool doesFileExist(const char *fn){
 
 int main(int argc, char* argv[]){
 	
-	Coordinate totalSize(8, 8, 8, 16);
-	int mag_factor = 2;
+	Coordinate totalSize(24, 24, 24, 64);
+	int mag_factor = 4;
 	string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/"
 		"b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
 		"ckpoint_lat.300";

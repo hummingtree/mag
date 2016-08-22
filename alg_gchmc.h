@@ -250,7 +250,7 @@ inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field,
 	prod = mul;
 }
 
-inline void getStaple(Matrix &staple, const Field<Matrix> &field, 
+inline void getStapleDagger(Matrix &staple, const Field<Matrix> &field, 
 					const Coordinate &x, const int mu){
 	vector<int> dir;
 	Matrix staple_; staple_.ZeroMatrix();
@@ -266,27 +266,7 @@ inline void getStaple(Matrix &staple, const Field<Matrix> &field,
 		getPathOrderedProd(m, field, x, dir);
 		staple_ += m;
 	}
-	staple = staple_;
-}
-
-inline double avg_plaquette_test(const qlat::Field<cps::Matrix> &gauge_field_qlat){
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
-	Matrix mStaple, mDagger; 	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x; geo_.coordinateFromIndex(x, index);
-		 for(int mu = 0; mu < DIM; mu++){
-			getStaple(mStaple, gauge_field_qlat, x, mu);
-			mDagger.Dagger(mStaple);
-			node_sum += \
-			(gauge_field_qlat.getElemsConst(x)[mu] * mDagger).ReTr();
-		 }
-	}
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum / (4. * 18. * getNumNode() * geo_.localVolume());
+	staple.Dagger(staple_);
 }
 
 inline void rnFillingSHA256Gaussian(std::vector<double> &xs)
@@ -369,38 +349,40 @@ private:
 	
 	inline void getForce(Matrix &force, const Coordinate &x, const int mu){
 		Matrix mStaple1, mStaple2, mTemp;
-		Matrix dagger1, dagger2;
-		Matrix mTemp1, mTemp2;
 		switch(isConstrained(x, mu, arg.mag)){
 			case 0: {
-				getStaple(mStaple1, gField, x, mu);
-				dagger1.Dagger(mStaple1); 
-				mTemp1 = gField.getElemsConst(x)[mu];
-				mTemp = mTemp1 * dagger1;
+				getStapleDagger(mStaple1, gField, x, mu);
+				mTemp = gField.getElemsConst(x)[mu] * mStaple1;
 				break;
 			}
 			case 1:
 			case 10: {
 				Coordinate y(x); y[mu]++;
-				getStaple(mStaple1, gField, x, mu);
-				getStaple(mStaple2, gField, y, mu);
-				dagger1.Dagger(mStaple1); 
-				dagger2.Dagger(mStaple2);
-				mTemp1 = gField.getElemsConst(x)[mu];
-				mTemp2 = gField.getElemsConst(y)[mu];
-				mTemp = mTemp2 * dagger2 - dagger1 * mTemp1;
+				getStapleDagger(mStaple1, gField, x, mu);
+				getStapleDagger(mStaple2, gField, y, mu);
+				mTemp = gField.getElemsConst(y)[mu] * mStaple2 \
+					- mStaple1 * gField.getElemsConst(x)[mu];
 				break;
 			}
 			case 100: force.ZeroMatrix(); break;
+			
+			// test case start
+	// 		case 100: {
+	// 			getStapleDagger(mStaple1, gField, x, mu);
+	// 			mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
+	// 			break;
+	// 		} 
+			// test case end
+		
 			default: assert(false);
 		}
 		
 		mTemp.TrLessAntiHermMatrix(); 
-		mTemp *= qlat::Complex(0., arg.beta / 3.);
-		force = mTemp;
+		force = mTemp * qlat::Complex(0., arg.beta / 3.);
 	}
 
-	inline void evolveMomemtum(double dt_){
+	inline void evolveMomentum(double dt_){
+		TIMER_VERBOSE("algCHmcWilson::evolveMomentum()");
 #pragma omp parallel for
 		for(long index = 0; index < mField.geo.localVolume(); index++){
 			Coordinate x; 
@@ -423,6 +405,7 @@ private:
 	}
 
 	inline void evolveGaugeField(double dt_){
+		TIMER_VERBOSE("algCHmcWilson::evolveGaugeField()");
 #pragma omp parallel for
 		for(long index = 0; index < gField.geo.localVolume(); index++){
 			Coordinate x; 
@@ -436,9 +419,10 @@ private:
 				switch(isConstrained(x, mu, arg.mag)){
 				case 0: {
 					LieA2LieG(mLeft, mField.getElems(x)[mu] * dt_);
-					gField.getElems(x)[mu] = mLeft * gField.getElems(x)[mu];
+					U = mLeft * U;
 					break;
 				}
+				// case 100: // test case
 				case 1: {
 					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
 					LieA2LieG(mRight, \
@@ -472,6 +456,7 @@ private:
 				mField.geo.coordinateFromIndex(x, index);
 				switch(isConstrained(x, mu, arg.mag)){
 					case 100: break;
+					// case 100: // test case
 					case 0:
 					case 1:
 					case 10:{
@@ -506,6 +491,14 @@ private:
 	}
 
 public:
+	double oldH, newH;
+	double dieRoll;
+	double deltaH;
+	double percentDeltaH;
+	double acceptProbability;
+	double avgPlaq;
+	bool doesAccept;
+
 	inline algCHmcWilson(argCHmcWilson arg_):
 		globalRngState("By the witness of the martyrs.")
 	{
@@ -545,13 +538,15 @@ public:
 	inline void runTraj(int trajNum){
 		initMomentum();
 		fetch_expanded(gField);
-		double oldH = getHamiltonian();
+		oldH = getHamiltonian();
 		for(int i = 0; i < arg.length; i++){
+
+		TIMER_VERBOSE("algCHmcWilson::runTraj()");
 
 			evolveGaugeField(arg.dt / 2.);
 			fetch_expanded(gField);
 
-			evolveMomemtum(arg.dt);
+			evolveMomentum(arg.dt);
 
 			evolveGaugeField(arg.dt / 2.);
 			fetch_expanded(gField);
@@ -559,36 +554,31 @@ public:
 		// 	evolveGaugeField(xi * arg.dt);
 		// 	fetch_expanded(gField);
 		// 	
-		// 	evolveMomemtum(arg.dt / 2.);
+		// 	evolveMomentum(arg.dt / 2.);
 
 		// 	evolveGaugeField((1 - 2. * xi) * arg.dt);
 		// 	fetch_expanded(gField);
 
-		// 	evolveMomemtum(arg.dt / 2.);
+		// 	evolveMomentum(arg.dt / 2.);
 		// 	
 		// 	evolveGaugeField(xi * arg.dt);
 		// 	fetch_expanded(gField);
-			
-			
-			// fetch_expanded(gField);
-			double avgPlaq = avg_plaquette(gField);
+				
+			double avgPlaq_ = avg_plaquette(gField);
 			if(getIdNode() == 0){
 				cout << "Traj #" << trajNum + 1 
 					<<  ", (literal)Step " << i + 1 
-					<< ":\tavgPlaq = " << avgPlaq << endl;
+					<< ":\tavgPlaq = " << avgPlaq_
+					<< endl;
 			}
-	// 		if(getIdNode() == 0)
-	// 			cout << "(literal)Step after " << i << endl;
-	// 		getHamiltonian();
-
 		}
 		
-		double newH = getHamiltonian();
-		double dieRoll = uRandGen(globalRngState);
-		double deltaH = newH - oldH;
-		double percentDeltaH = deltaH / oldH;
-		double acceptProbability = exp(oldH - newH);
-		bool doesAccept = (dieRoll < acceptProbability);
+		newH = getHamiltonian();
+		dieRoll = uRandGen(globalRngState);
+		deltaH = newH - oldH;
+		percentDeltaH = deltaH / oldH;
+		acceptProbability = exp(oldH - newH);
+		doesAccept = (dieRoll < acceptProbability);
 		MPI_Bcast((void *)&doesAccept, 1, MPI_BYTE, 0, getComm());
 		// make sure that all the node make the same decision.
 		if(doesAccept){
@@ -618,7 +608,8 @@ public:
 			}
 			gField = *(arg.gFieldExt);
 		}
-
+		fetch_expanded(gField);
+		avgPlaq = avg_plaquette(gField);
 	}
 
 };
