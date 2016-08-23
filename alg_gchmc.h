@@ -364,14 +364,14 @@ private:
 					- mStaple1 * gField.getElemsConst(x)[mu];
 				break;
 			}
-			case 100: force.ZeroMatrix(); break;
+			// case 100: force.ZeroMatrix(); break;
 			
 			// test case start
-	// 		case 100: {
-	// 			getStapleDagger(mStaple1, gField, x, mu);
-	// 			mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
-	// 			break;
-	// 		} 
+			case 100: {
+				getStapleDagger(mStaple1, gField, x, mu);
+				mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
+				break;
+			} 
 			// test case end
 		
 			default: assert(false);
@@ -382,7 +382,7 @@ private:
 	}
 
 	inline void evolveMomentum(double dt_){
-		TIMER_VERBOSE("algCHmcWilson::evolveMomentum()");
+		TIMER("algCHmcWilson::evolveMomentum()");
 #pragma omp parallel for
 		for(long index = 0; index < mField.geo.localVolume(); index++){
 			Coordinate x; 
@@ -405,7 +405,7 @@ private:
 	}
 
 	inline void evolveGaugeField(double dt_){
-		TIMER_VERBOSE("algCHmcWilson::evolveGaugeField()");
+		TIMER("algCHmcWilson::evolveGaugeField()");
 #pragma omp parallel for
 		for(long index = 0; index < gField.geo.localVolume(); index++){
 			Coordinate x; 
@@ -422,7 +422,7 @@ private:
 					U = mLeft * U;
 					break;
 				}
-				// case 100: // test case
+				case 100: // test case
 				case 1: {
 					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
 					LieA2LieG(mRight, \
@@ -436,11 +436,11 @@ private:
 					U = U * mRight;
 					break;
 				}
-				case 100: {
-					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
-					U = mLeft * U;
-					break;
-				}
+		// 		case 100: {
+		// 			LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
+		// 			U = mLeft * U;
+		// 			break;
+		// 		}
 				default: assert(false);
 				}
 		}}
@@ -455,8 +455,8 @@ private:
 				Coordinate x; 
 				mField.geo.coordinateFromIndex(x, index);
 				switch(isConstrained(x, mu, arg.mag)){
-					case 100: break;
-					// case 100: // test case
+					// case 100: break;
+					case 100: // test case
 					case 0:
 					case 1:
 					case 10:{
@@ -498,6 +498,8 @@ public:
 	double acceptProbability;
 	double avgPlaq;
 	bool doesAccept;
+	int numAccept;
+	int numReject;
 
 	inline algCHmcWilson(argCHmcWilson arg_):
 		globalRngState("By the witness of the martyrs.")
@@ -512,6 +514,9 @@ public:
 	
 		gField.init(geo_); gField = *(arg.gFieldExt);
 		mField.init(gField.geo);
+
+		numAccept = 0;
+		numReject = 0;
 	}
 
 	inline void initMomentum(){
@@ -536,20 +541,27 @@ public:
 	}
 
 	inline void runTraj(int trajNum){
+		
+		TIMER("algCHmcWilson::runTraj()");
+		
 		initMomentum();
 		fetch_expanded(gField);
 		oldH = getHamiltonian();
 		for(int i = 0; i < arg.length; i++){
 
-		TIMER_VERBOSE("algCHmcWilson::runTraj()");
-
 			evolveGaugeField(arg.dt / 2.);
+			{
+			// TIMER_VERBOSE("fetch_expanded");
 			fetch_expanded(gField);
+			}
 
 			evolveMomentum(arg.dt);
 
 			evolveGaugeField(arg.dt / 2.);
+			{
+			// TIMER_VERBOSE("fetch_expanded");
 			fetch_expanded(gField);
+			}
 
 		// 	evolveGaugeField(xi * arg.dt);
 		// 	fetch_expanded(gField);
@@ -571,6 +583,8 @@ public:
 					<< ":\tavgPlaq = " << avgPlaq_
 					<< endl;
 			}
+
+			// reunitarize(gField);
 		}
 		
 		newH = getHamiltonian();
@@ -592,6 +606,7 @@ public:
 				cout << "Die Roll =       \t" << dieRoll << endl; 
 				cout << "Delta H =        \t" << deltaH << endl; 
 				cout << "Delta H Ratio =  \t" << percentDeltaH << endl; 
+				numAccept++;
 			}
 			*(arg.gFieldExt) = gField;
 		}else{
@@ -605,6 +620,7 @@ public:
 				cout << "Die Roll =       \t" << dieRoll << endl; 
 				cout << "Delta H =        \t" << deltaH << endl; 
 				cout << "Delta H Ratio =  \t" << percentDeltaH << endl; 
+				numReject++;
 			}
 			gField = *(arg.gFieldExt);
 		}

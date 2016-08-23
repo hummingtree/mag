@@ -118,6 +118,7 @@ private:
 
 	inline bool isConstrained(int *x, int mu, int mag)
 	{
+		// return false; // test case
 		bool isConstrained_ = true;
 		for(int i = 0; i < 4; i++){
 			if(i == mu) continue;
@@ -259,11 +260,11 @@ private:
 public:
 	inline void showInfo(){
 	
-		cout << "mag = " << gchbArg_->mag << endl;
-		cout << "numIter = " << gchbArg_->numIter << endl;
-		cout << "nHits = " << gchbArg_->nHits << endl;
-		cout << "small = " << gchbArg_->small << endl;
-		cout << "beta = " << GJP.Beta() << endl;
+		cout << "mag     =\t" << gchbArg_->mag << endl;
+		cout << "numIter =\t" << gchbArg_->numIter << endl;
+		cout << "nHits   =\t" << gchbArg_->nHits << endl;
+		cout << "small   =\t" << gchbArg_->small << endl;
+		cout << "beta    =\t" << GJP.Beta() << endl;
 		
 	}
 		
@@ -325,7 +326,20 @@ public:
 				LRG.AssignGenerator(x);
 				
 				if(isConstrained(x, mut, gchbArg_->mag)){
-				if(x[mut] % gchbArg_->mag == gchbArg_->mag - 1){}
+				if(x[mut] % gchbArg_->mag == gchbArg_->mag - 1){
+			// test case start
+			
+					Matrix mStaple;
+					lat.Staple(mStaple, x, mut);
+					long localIndexCPS; 
+					GJP.localIndexFromPos(x, localIndexCPS);
+					metropolisKernel(
+						mPtr[mut + 4 * localIndexCPS],
+						mStaple
+						);
+			//
+			// test case end
+				}
 					else{
 						int y[4]; memcpy(y, x, 4 * sizeof(int));
 						y[mut]++;
@@ -352,7 +366,23 @@ public:
 				}			
 	 		}}}}}
 	 		lat.Reunitarize();
+
+			double avgPlaq = lat.SumReTrPlaq() / (18. * GJP.VolSites());
+			double avgConsPlaq = check_constrained_plaquette(lat, gchbArg_->mag);
+
+			if(UniqueID() == 0){
+		// 		cout 
+		// 		<< "Thermalization Cycle =\t" << i << endl
+		// 		<< "avgPlaq              =\t" << avgPlaq << endl
+		// 	 	<< "avgConsPlaq          =\t" << avgConsPlaq << endl;
+				cout 
+				<< i << "\t"
+				<< avgPlaq << "\t"
+				<< avgConsPlaq << endl;
 		}
+
+		}
+
 	}
 };
 
