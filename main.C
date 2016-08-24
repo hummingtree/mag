@@ -158,9 +158,9 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
-	argHMC.length = 50;
+	argHMC.length = 1;
 	argHMC.beta = 6.80;
-	argHMC.dt = 0.02;
+	argHMC.dt = 0.002;
 	argHMC.gFieldExt = &gauge_field_qlat;
 	int numTraj = 500;
 

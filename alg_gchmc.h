@@ -317,6 +317,7 @@ private:
 
 	argCHmcWilson arg;
 	Field<Matrix> gField;
+	Field<Matrix> gFieldAux; // not initialized in the constructor
 	Field<Matrix> mField;
 
 	inline int isConstrained(const Coordinate &x, int mu, int mag)
@@ -347,103 +348,124 @@ private:
 		}
 	}
 	
-	inline void getForce(Matrix &force, const Coordinate &x, const int mu){
+	inline void getForce(Field<Matrix> &fField_, const Field<Matrix> &gField_){
 		Matrix mStaple1, mStaple2, mTemp;
-		switch(isConstrained(x, mu, arg.mag)){
-			case 0: {
-				getStapleDagger(mStaple1, gField, x, mu);
-				mTemp = gField.getElemsConst(x)[mu] * mStaple1;
+		assert(isMatchingGeo(fField_.geo, gField_.geo));
+#pragma omp parallel for
+		for(long index = 0; index < fField_.geo.localVolume(); index++){
+			Coordinate x; 
+			fField_.geo.coordinateFromIndex(x, index);
+			for(int mu = 0; mu < fField_.geo.multiplicity; mu++){
+				switch(isConstrained(x, mu, arg.mag)){
+				case 0: {
+				getStapleDagger(mStaple1, gField_, x, mu);
+				mTemp = gField_.getElemsConst(x)[mu] * mStaple1;
 				break;
-			}
-			case 1:
-			case 10: {
+				}
+				case 1:
+				case 10: {
 				Coordinate y(x); y[mu]++;
-				getStapleDagger(mStaple1, gField, x, mu);
-				getStapleDagger(mStaple2, gField, y, mu);
-				mTemp = gField.getElemsConst(y)[mu] * mStaple2 \
-					- mStaple1 * gField.getElemsConst(x)[mu];
+				getStapleDagger(mStaple1, gField_, x, mu);
+				getStapleDagger(mStaple2, gField_, y, mu);
+				mTemp = gField_.getElemsConst(y)[mu] * mStaple2 \
+					- mStaple1 * gField_.getElemsConst(x)[mu];
 				break;
-			}
-			// case 100: force.ZeroMatrix(); break;
+				}
+				// case 100: force.ZeroMatrix(); break;
 			
-			// test case start
-			case 100: {
-				getStapleDagger(mStaple1, gField, x, mu);
-				mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
+				// test case start
+				case 100: {
+				getStapleDagger(mStaple1, gField_, x, mu);
+				mTemp = mStaple1 * gField_.getElemsConst(x)[mu] * -1.;
 				break;
-			} 
-			// test case end
+				} 
+				// test case end
 		
-			default: assert(false);
-		}
+				default: assert(false);
+				}
 		
-		mTemp.TrLessAntiHermMatrix(); 
-		force = mTemp * qlat::Complex(0., arg.beta / 3.);
+				mTemp.TrLessAntiHermMatrix(); 
+				fField_.getElems(x)[mu] = \
+					mTemp * qlat::Complex(0., arg.beta / 3.);
+		}}
+
 	}
 
-	inline void evolveMomentum(double dt_){
+	inline void evolveMomentum(Field<Matrix> &mField_, 
+				const Field<Matrix> &fField_, double dt_){
 		TIMER("algCHmcWilson::evolveMomentum()");
+		assert(isMatchingGeo(mField_.geo, fField_.geo));
 #pragma omp parallel for
-		for(long index = 0; index < mField.geo.localVolume(); index++){
+		for(long index = 0; index < mField_.geo.localVolume(); index++){
 			Coordinate x; 
-			mField.geo.coordinateFromIndex(x, index);
-			Matrix mForce;
-			for(int mu = 0; mu < gField.geo.multiplicity; mu++){
-			// only works for cps::Matrix
-				getForce(mForce, x, mu);
-		// 		if(getIdNode() == 0){
-		// 			cout << "Before: " << endl;
-		// 			cout << mField.getElems(x)[mu] << endl;
-		// 		}
-				mField.getElems(x)[mu] += mForce * dt_;
-		// 		if(getIdNode() == 0){
-		// 			cout << "After: " << endl;
-		// 			cout << mField.getElems(x)[mu] << endl;
-		// 		}
-
+			mField_.geo.coordinateFromIndex(x, index);
+			for(int mu = 0; mu < mField_.geo.multiplicity; mu++){
+				mField_.getElems(x)[mu] += \
+						fField_.getElemsConst(x)[mu] * dt_;
 		}}
 	}
 
-	inline void evolveGaugeField(double dt_){
+	inline void evolveGaugeField(Field<Matrix> &gField_, 
+				const Field<Matrix> &mField_, double dt_){
 		TIMER("algCHmcWilson::evolveGaugeField()");
+		assert(isMatchingGeo(mField_.geo, gField_.geo));
 #pragma omp parallel for
-		for(long index = 0; index < gField.geo.localVolume(); index++){
+		for(long index = 0; index < gField_.geo.localVolume(); index++){
 			Coordinate x; 
-			gField.geo.coordinateFromIndex(x, index);
-			Matrix mTemp;
-			Matrix mLeft, mRight;
-			for(int mu = 0; mu < gField.geo.multiplicity; mu++){
+			gField_.geo.coordinateFromIndex(x, index);
+			Matrix mL, mR;
+			for(int mu = 0; mu < gField_.geo.multiplicity; mu++){
 			// only works for cps::Matrix
-				Matrix &U = gField.getElems(x)[mu];
+				Matrix &U = gField_.getElems(x)[mu];
 				Coordinate y(x); y[mu]--;
 				switch(isConstrained(x, mu, arg.mag)){
 				case 0: {
-					LieA2LieG(mLeft, mField.getElems(x)[mu] * dt_);
-					U = mLeft * U;
-					break;
+				LieA2LieG(mL, mField_.getElemsConst(x)[mu] * dt_);
+				U = mL * U;
+				break;
 				}
 				case 100: // test case
 				case 1: {
-					LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
-					LieA2LieG(mRight, \
-						mField.getElems(x)[mu] * -dt_);
-					U = mLeft * U * mRight;
-					break;
+				LieA2LieG(mL, mField_.getElemsConst(y)[mu] * dt_);
+				LieA2LieG(mR, mField_.getElemsConst(x)[mu] * -dt_);
+				U = mL * U * mR;
+				break;
 				}
 				case 10: {
-					LieA2LieG(mRight, \
-						mField.getElems(x)[mu] * -dt_);
-					U = U * mRight;
-					break;
+				LieA2LieG(mR, mField_.getElemsConst(x)[mu] * -dt_);
+				U = U * mR;
+				break;
 				}
 		// 		case 100: {
-		// 			LieA2LieG(mLeft, mField.getElems(y)[mu] * dt_);
-		// 			U = mLeft * U;
-		// 			break;
+		// 		LieA2LieG(mL, mField_.getElemsConst(y)[mu] * dt_);
+		// 		U = mL * U;
+		// 		break;
 		// 		}
 				default: assert(false);
 				}
 		}}
+	}
+
+	inline void forceGradientStep(){
+		
+	}
+
+	inline void LeapFrogIntegrator(Field<Matrix> &gField_, 
+				Field<Matrix> &mField_, double dt_, int length_){
+		assert(isMatchingGeo(gField_.geo, mField_.geo));
+		Geometry geo_; 
+		geo_.init(gField_.geo.geon, \
+			gField_.geo.multiplicity, gField_.geo.nodeSite);
+		
+		static Field<Matrix> fField_; fField_.init(geo_);
+ 		for(int i = 0; i < length_; i++){
+ 			evolveGaugeField(gField_, mField_, dt_);
+			fetch_expanded(gField_);
+			getForce(fField_, gField_);
+ 			evolveMomentum(mField_, fField_, dt_);
+ 			// evolveGaugeField(gField_, mField_, dt_ / 2.);
+ 			// reunitarize(gField);
+ 		}
 	}
 
 	inline double getHamiltonian(){
@@ -547,46 +569,10 @@ public:
 		initMomentum();
 		fetch_expanded(gField);
 		oldH = getHamiltonian();
-		for(int i = 0; i < arg.length; i++){
+	
+		LeapFrogIntegrator(gField, mField, arg.dt, arg.length);
 
-			evolveGaugeField(arg.dt / 2.);
-			{
-			// TIMER_VERBOSE("fetch_expanded");
-			fetch_expanded(gField);
-			}
-
-			evolveMomentum(arg.dt);
-
-			evolveGaugeField(arg.dt / 2.);
-			{
-			// TIMER_VERBOSE("fetch_expanded");
-			fetch_expanded(gField);
-			}
-
-		// 	evolveGaugeField(xi * arg.dt);
-		// 	fetch_expanded(gField);
-		// 	
-		// 	evolveMomentum(arg.dt / 2.);
-
-		// 	evolveGaugeField((1 - 2. * xi) * arg.dt);
-		// 	fetch_expanded(gField);
-
-		// 	evolveMomentum(arg.dt / 2.);
-		// 	
-		// 	evolveGaugeField(xi * arg.dt);
-		// 	fetch_expanded(gField);
-				
-			double avgPlaq_ = avg_plaquette(gField);
-			if(getIdNode() == 0){
-				cout << "Traj #" << trajNum + 1 
-					<<  ", (literal)Step " << i + 1 
-					<< ":\tavgPlaq = " << avgPlaq_
-					<< endl;
-			}
-
-			// reunitarize(gField);
-		}
-		
+		fetch_expanded(gField);
 		newH = getHamiltonian();
 		dieRoll = uRandGen(globalRngState);
 		deltaH = newH - oldH;
@@ -629,10 +615,4 @@ public:
 	}
 
 };
-
-
-
-
-
-
 
