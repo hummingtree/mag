@@ -162,9 +162,11 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	argHMC.dt = 0.02;
 
 	rePort result("/bgusr/home/jtu/mag/alg_gchmc_test.dat");
+	result.os->setf(ios::scientific, ios::showpos);
+	result.os->precision(8);
 	time_t now = time(NULL);
 	result << show(gauge_field_qlat.geo) << endl;
-	result << "# " << ctime(&now)
+	result  << "# " << ctime(&now)
 		<< "# mag =        " << argHMC.mag << endl
 		<< "# trajLength = " << argHMC.trajLength << endl
 		<< "# numTraj =    " << argHMC.numTraj << endl
