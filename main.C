@@ -123,11 +123,11 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	// int x_qlat[4];
 
 	syncNode();
-	Coordinate coorNode; coorNodeFromIdNode(coorNode, getIdNode());
-	std::cout << "cps UniqueID(): " << UniqueID() << "; "
-		<< CoorX() << "x" << CoorY() << "x"<< CoorZ() << "x"<< CoorT() << "."
-			 << "\tqlat: getIdNode(): " << getIdNode() << "; "
-				<< show(coorNode) << "." << std::endl;
+// 	Coordinate coorNode; coorNodeFromIdNode(coorNode, getIdNode());
+// 	std::cout << "cps UniqueID(): " << UniqueID() << "; "
+// 		<< CoorX() << "x" << CoorY() << "x"<< CoorZ() << "x"<< CoorT() << "."
+// 			 << "\tqlat: getIdNode(): " << getIdNode() << "; "
+// 				<< show(coorNode) << "." << std::endl;
 
 	// expand field from CPS to qlat
 	// naive_field_expansion(lat, gauge_field_qlat, mag);
@@ -151,59 +151,69 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 
 	// HMC in qlat ------------------- start -------------------
-
-	FILE *resultFile = NULL;	
 	
 	vector<double> avgPlaqList(0);
 
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
-	argHMC.length = 50;
+	argHMC.trajLength = 50;
+	argHMC.numTraj = 100;
 	argHMC.beta = 6.80;
 	argHMC.dt = 0.02;
-	argHMC.gFieldExt = &gauge_field_qlat;
-	int numTraj = 200;
 
-	if(getIdNode() == 0){
-		resultFile = fopen((export_addr + "_HMC_traj_info.dat").c_str(), "a");
-		assert(resultFile != NULL);
-		time_t now = time(NULL);
-		fputs("# ", resultFile);
-		fputs(ctime(&now), resultFile);
-		fprintf(resultFile, "# mag =        %i\n", argHMC.mag);
-		fprintf(resultFile, "# trajLength = %i\n", argHMC.length);
-		fprintf(resultFile, "# numTraj =    %i\n", numTraj);
-		fprintf(resultFile, "# beta =       %.3f\n", argHMC.beta);
-		fprintf(resultFile, "# dt =         %.5f\n", argHMC.dt);
-		fprintf(resultFile, "# traj#\texp(-DeltaH)\tavgPlaq\tA/R\n");
-		fflush(resultFile);
-		cout << "resultFile opened." << endl;
-	}
+	rePort result("/bgusr/home/jtu/mag/alg_gchmc_test.dat");
+	time_t now = time(NULL);
+	result << show(gauge_field_qlat.geo) << endl;
+	result << "# " << ctime(&now)
+		<< "# mag =        " << argHMC.mag << endl
+		<< "# trajLength = " << argHMC.trajLength << endl
+		<< "# numTraj =    " << argHMC.numTraj << endl
+		<< "# beta =       " << argHMC.beta << endl
+		<< "# dt =         " << argHMC.dt << endl
+		<< "# traj#\texp(-DeltaH)\tavgPlaq\tA/R" << endl;
+	
+	runHMC(gauge_field_qlat, argHMC, result);
+
+// 	if(getIdNode() == 0){
+// 		resultFile = fopen((export_addr + "_HMC_traj_info.dat").c_str(), "a");
+// 		assert(resultFile != NULL);
+// 		time_t now = time(NULL);
+// 		fputs("# ", resultFile);
+// 		fputs(ctime(&now), resultFile);
+// 		fprintf(resultFile, "# mag =        %i\n", argHMC.mag);
+// 		fprintf(resultFile, "# trajLength = %i\n", argHMC.length);
+// 		fprintf(resultFile, "# numTraj =    %i\n", numTraj);
+// 		fprintf(resultFile, "# beta =       %.3f\n", argHMC.beta);
+// 		fprintf(resultFile, "# dt =         %.5f\n", argHMC.dt);
+// 		fprintf(resultFile, "# traj#\texp(-DeltaH)\tavgPlaq\tA/R\n");
+// 		fflush(resultFile);
+// 		cout << "resultFile opened." << endl;
+// 	}
 		
-	algCHmcWilson algHMC(argHMC);
-	for(int i = 0; i < numTraj; i++){
-		algHMC.runTraj(i);
-		if(getIdNode() == 0){
-			fprintf(resultFile, "%i\t%.6e\t%.6e\t%i\n", \
-			i + 1, algHMC.acceptProbability, algHMC.avgPlaq, \
-			algHMC.doesAccept);
-			fflush(resultFile);
-			if(i > 200) avgPlaqList.push_back(algHMC.avgPlaq);
-			cout << "avgPlaq = " << algHMC.avgPlaq << endl;
-		} 
-	}
-
-	if(getIdNode() == 0){
-		fprintf(resultFile, "Accept Rate = %.3f\n", \
-		(double)algHMC.numAccept / (algHMC.numAccept + algHMC.numReject));
-		fprintf(resultFile, "# avgPlaq autoCorr = %.6e\n", \
-			autoCorrelation(avgPlaqList.data(), avgPlaqList.size()));
-		double avg;
-		double std = jackknife(avgPlaqList.data(), avgPlaqList.size(), 10, avg);
-		fprintf(resultFile, "# avgPlaq average  = %.6e\tavgPlaq std = %.6e\n", \
-			avg, std);
-
-	}
+// 	algCHmcWilson algHMC(argHMC);
+// 	for(int i = 0; i < numTraj; i++){
+// 		algHMC.runTraj(i);
+// 		if(getIdNode() == 0){
+// 			fprintf(resultFile, "%i\t%.6e\t%.6e\t%i\n", i + 1, 
+// 				algHMC.acceptProbability, algHMC.avgPlaq, 
+// 				algHMC.doesAccept);
+// 			fflush(resultFile);
+// 			if(i > 200) avgPlaqList.push_back(algHMC.avgPlaq);
+// 			cout << "avgPlaq = " << algHMC.avgPlaq << endl;
+// 		} 
+// 	}
+// 
+// 	if(getIdNode() == 0){
+// 		fprintf(resultFile, "Accept Rate = %.3f\n", 
+// 		(double)algHMC.numAccept / (algHMC.numAccept + algHMC.numReject));
+// 		fprintf(resultFile, "# avgPlaq autoCorr = %.6e\n", 
+// 			autoCorrelation(avgPlaqList.data(), avgPlaqList.size()));
+// 		double avg;
+// 		double std = jackknife(avgPlaqList.data(), avgPlaqList.size(), 10, avg);
+// 		fprintf(resultFile, "# avgPlaq average  = %.6e\tavgPlaq std = %.6e\n", 
+// 			avg, std);
+// 
+// 	}
 
 	cout << check_constrained_plaquette(gauge_field_qlat, mag) << endl;	
 	// HMC in qlat -------------------- end --------------------
