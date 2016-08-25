@@ -84,7 +84,7 @@ inline vector<Matrix> initGenerator(){
 
 static const vector<Matrix> su3Generator = initGenerator();
 
-inline double avg_plaquette(const qlat::Field<cps::Matrix> &gauge_field_qlat){
+inline double avg_plaquette(const qlat::Field<Matrix> &gauge_field_qlat){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
@@ -99,16 +99,16 @@ inline double avg_plaquette(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
-		 	cps::Matrix mul; mul.UnitMatrix();
+		 	Matrix mul; mul.UnitMatrix();
 			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
 			x_qlat = x_qlat + dir_vec[mu];
 			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
 			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			cps::Matrix dag1; 
+			Matrix dag1; 
 			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
 			mul = mul * dag1;
 			x_qlat = x_qlat - dir_vec[nu];
-			cps::Matrix dag2;
+			Matrix dag2;
 			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
 			mul = mul * dag2;
 
@@ -121,7 +121,7 @@ inline double avg_plaquette(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 	return global_sum / (18. * getNumNode() * geo_.localVolume());
 }
 
-inline double totalPlaq(const qlat::Field<cps::Matrix> &gauge_field_qlat){
+inline double totalPlaq(const qlat::Field<Matrix> &gauge_field_qlat){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
@@ -136,16 +136,16 @@ inline double totalPlaq(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
-		 	cps::Matrix mul; mul.UnitMatrix();
+		 	Matrix mul; mul.UnitMatrix();
 			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
 			x_qlat = x_qlat + dir_vec[mu];
 			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
 			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			cps::Matrix dag1; 
+			Matrix dag1; 
 			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
 			mul = mul * dag1;
 			x_qlat = x_qlat - dir_vec[nu];
-			cps::Matrix dag2;
+			Matrix dag2;
 			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
 			mul = mul * dag2;
 
@@ -158,7 +158,7 @@ inline double totalPlaq(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 	return global_sum;
 }
 
-inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
+inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	qlat::Geometry geo_ = gauge_field_qlat.geo;
 	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.localVolume(); index++){
@@ -175,7 +175,7 @@ inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 }
 
 inline double check_constrained_plaquette(
-				const qlat::Field<cps::Matrix> &gauge_field_qlat,
+				const qlat::Field<Matrix> &gauge_field_qlat,
 				int mag){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
@@ -349,11 +349,11 @@ private:
 	}
 	
 	inline void getForce(Field<Matrix> &fField_, const Field<Matrix> &gField_){
-		Matrix mStaple1, mStaple2, mTemp;
 		assert(isMatchingGeo(fField_.geo, gField_.geo));
 #pragma omp parallel for
 		for(long index = 0; index < fField_.geo.localVolume(); index++){
 			Coordinate x; 
+			Matrix mStaple1, mStaple2, mTemp;
 			fField_.geo.coordinateFromIndex(x, index);
 			for(int mu = 0; mu < fField_.geo.multiplicity; mu++){
 				switch(isConstrained(x, mu, arg.mag)){
@@ -415,7 +415,7 @@ private:
 			gField_.geo.coordinateFromIndex(x, index);
 			Matrix mL, mR;
 			for(int mu = 0; mu < gField_.geo.multiplicity; mu++){
-			// only works for cps::Matrix
+			// only works for Matrix
 				Matrix &U = gField_.getElems(x)[mu];
 				Coordinate y(x); y[mu]--;
 				switch(isConstrained(x, mu, arg.mag)){
@@ -458,18 +458,40 @@ private:
 			gField_.geo.multiplicity, gField_.geo.nodeSite);
 		
 		static Field<Matrix> fField_; fField_.init(geo_);
- 		for(int i = 0; i < length_; i++){
- 			evolveGaugeField(gField_, mField_, dt_);
-			fetch_expanded(gField_);
-			getForce(fField_, gField_);
+ 		evolveGaugeField(gField_, mField_, dt_ / 2.);
+        	for(int i = 0; i < length_; i++){
+        		fetch_expanded(gField_);
+        		getForce(fField_, gField_);
  			evolveMomentum(mField_, fField_, dt_);
- 			// evolveGaugeField(gField_, mField_, dt_ / 2.);
- 			// reunitarize(gField);
+ 			if(i < length_ - 1) evolveGaugeField(gField_, mField_, dt_);
+        		else evolveGaugeField(gField_, mField_, dt_ / 2.);
  		}
+
+// 		for(int i = 0; i < length_; i++){
+// 			evolveGaugeField(gField_, mField_, dt_ / 2.);
+// 			fetch_expanded(gField_);
+// 			getForce(fField_, gField_);
+// 			evolveMomentum(mField_, fField_, dt_);
+// 			evolveGaugeField(gField_, mField_, dt_ / 2.);
+// 		}
+
+	if(getIdNode() == 0){
+			Matrix I = gField_.getElems(Coordinate(0,0,0,0))[0];
+			cout << I << endl;
+			Matrix J; J.Dagger(I);
+			cout << I * J << endl;
+		}
+		reunitarize(gField_);
+		if(getIdNode() == 0){
+			Matrix I = gField_.getElems(Coordinate(0,0,0,0))[0];
+			cout << I << endl;
+			Matrix J; J.Dagger(I);
+			cout << I * J << endl;
+		}
 	}
 
 	inline double getHamiltonian(){
-		static double oldKE = 0., oldPE = 0., oldTotalE = 0.;
+// 		static double oldKE = 0., oldPE = 0., oldTotalE = 0.;
 		double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
 #pragma omp parallel for reduction(+:localSum)
 		for(long index = 0; index < mField.geo.localVolume(); index++){
@@ -494,20 +516,20 @@ private:
 		MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, getComm());
 		double kineticEnergy = globalSum / 2.;
 		double potentialEnergy = -totalPlaq(gField) * arg.beta / 3.;
-		if(getIdNode() == 0){
-	// 		cout << "kinEng = \t" << kineticEnergy << endl;
-	// 		cout << "potEng = \t" << potentialEnergy << endl;
-	// 		cout << "totEng = \t" 
-	// 			<< kineticEnergy + potentialEnergy << endl;
-	// 		cout << "delKin = \t" << kineticEnergy - oldKE << endl;
-	//		cout << "delPot = \t" << potentialEnergy - oldPE << endl;
-			// cout << "ratio = " << (kineticEnergy - oldKE) / (potentialEnergy - oldPE) << endl;
-	//		cout << "delPer = \t" << (kineticEnergy + potentialEnergy - oldTotalE) / oldTotalE << endl;
-		}
-
-		oldKE = kineticEnergy;
-		oldPE = potentialEnergy;
-		oldTotalE = kineticEnergy + potentialEnergy;
+// 		if(getIdNode() == 0){
+// 	 		cout << "kinEng = \t" << kineticEnergy << endl;
+// 	 		cout << "potEng = \t" << potentialEnergy << endl;
+// 	 		cout << "totEng = \t" 
+// 	 			<< kineticEnergy + potentialEnergy << endl;
+// 	 		cout << "delKin = \t" << kineticEnergy - oldKE << endl;
+// 			cout << "delPot = \t" << potentialEnergy - oldPE << endl;
+// 			cout << "ratio = " << (kineticEnergy - oldKE) / (potentialEnergy - oldPE) << endl;
+// 			cout << "delPer = \t" << (kineticEnergy + potentialEnergy - oldTotalE) / oldTotalE << endl;
+// 		}
+// 
+// 		oldKE = kineticEnergy;
+// 		oldPE = potentialEnergy;
+// 		oldTotalE = kineticEnergy + potentialEnergy;
 
 		return kineticEnergy + potentialEnergy;
 	}

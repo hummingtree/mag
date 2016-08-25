@@ -40,8 +40,7 @@ extern MPI_Comm QMP_COMM_WORLD;
 void reunitarize(Field<Matrix> &field){
 #pragma omp parallel for
                 for(long index = 0; index < field.geo.localVolume(); index++){
-                        Coordinate x;
-                        field.geo.coordinateFromIndex(x, index);
+                        Coordinate x; field.geo.coordinateFromIndex(x, index);
                         for(int mu = 0; mu < field.geo.multiplicity; mu++){
 				field.getElems(x)[mu].Unitarize();
 		}}	

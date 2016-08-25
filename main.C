@@ -158,11 +158,11 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 
 	argCHmcWilson argHMC;
 	argHMC.mag = mag;
-	argHMC.length = 1;
+	argHMC.length = 50;
 	argHMC.beta = 6.80;
-	argHMC.dt = 0.002;
+	argHMC.dt = 0.02;
 	argHMC.gFieldExt = &gauge_field_qlat;
-	int numTraj = 500;
+	int numTraj = 200;
 
 	if(getIdNode() == 0){
 		resultFile = fopen((export_addr + "_HMC_traj_info.dat").c_str(), "a");
@@ -188,7 +188,8 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 			i + 1, algHMC.acceptProbability, algHMC.avgPlaq, \
 			algHMC.doesAccept);
 			fflush(resultFile);
-			if(i > 100) avgPlaqList.push_back(algHMC.avgPlaq);
+			if(i > 200) avgPlaqList.push_back(algHMC.avgPlaq);
+			cout << "avgPlaq = " << algHMC.avgPlaq << endl;
 		} 
 	}
 
@@ -198,7 +199,7 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 		fprintf(resultFile, "# avgPlaq autoCorr = %.6e\n", \
 			autoCorrelation(avgPlaqList.data(), avgPlaqList.size()));
 		double avg;
-		double std = jackknife(avgPlaqList.data(), avgPlaqList.size(), 50, avg);
+		double std = jackknife(avgPlaqList.data(), avgPlaqList.size(), 10, avg);
 		fprintf(resultFile, "# avgPlaq average  = %.6e\tavgPlaq std = %.6e\n", \
 			avg, std);
 
