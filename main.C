@@ -161,7 +161,7 @@ void CPS2QLAT2File(const Coordinate &totalSize, int mag,
 	argHMC.beta = 6.80;
 	argHMC.dt = 0.02;
 
-	rePort result("/bgusr/home/jtu/mag/alg_gchmc_test.dat");
+	rePort result("/bgusr/home/jtu/mag/data/alg_gchmc_test.dat");
 	result.os->setf(ios::scientific, ios::showpos);
 	result.os->precision(8);
 	time_t now = time(NULL);
@@ -374,7 +374,7 @@ bool doesFileExist(const char *fn){
 
 int main(int argc, char* argv[]){
 	
-	Coordinate totalSize(8, 8, 8, 8);
+	Coordinate totalSize(8, 8, 8, 16);
 	int mag_factor = 2;
 	// string cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/"
 	// 	"b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"

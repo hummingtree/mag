@@ -462,43 +462,43 @@ inline void evolveGaugeField(Field<Matrix> &gField,
 
 inline void forceGradientIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 				const argCHmcWilson &arg){
-	assert(isMatchingGeo(gField.geo, mField.geo));
+//	assert(isMatchingGeo(gField.geo, mField.geo));
 	
-	static const double alpha = (3. - sqrt(3.)) * arg.dt / 6.;
-	static const double beta  = arg.dt / sqrt(3.);
-	static const double gamma = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
-	
-	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
-	static Field<Matrix> mFieldAuxil; mFieldAuxil.init(mField.geo);
-	static Field<Matrix> fField; fField.init(mField.geo);
-
-	for(int i = 0; i < arg.trajLength; i++){
-		evolveGaugeField(gField, mField, alpha, arg);
-		
-		fetch_expanded(gField);
-		getForce(fField, gField, arg);
-		mFieldAuxil.fillZero();
-		evolveMomentum(mFieldAuxil, fField, gamma, arg);
-		gFieldAuxil = gField;
-		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-		fetch_expanded(gFieldAuxil);
-		getForce(fField, gFieldAuxil, arg);
-		evolveMomentum(mField, fField, 0.5, arg);
-
-		evolveGaugeField(gField, mField, beta, arg);
-	
-		fetch_expanded(gField);
-		getForce(fField, gField, arg);
-		mFieldAuxil.fillZero();
-		evolveMomentum(mFieldAuxil, fField, gamma, arg);
-		gFieldAuxil = gField;
-		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-		fetch_expanded(gFieldAuxil);
-		getForce(fField, gFieldAuxil, arg);
-		evolveMomentum(mField, fField, 0.5, arg);
-
-		evolveGaugeField(gField, mField, alpha, arg);
-	}
+// 	const double a11 = (3. - sqrt(3.)) * arg.dt / 6.;
+// 	const double b11 = arg.dt / sqrt(3.);
+// 	const double g11 = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
+// 	
+// 	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
+// 	static Field<Matrix> mFieldAuxil; mFieldAuxil.init(mField.geo);
+// 	static Field<Matrix> fField; fField.init(mField.geo);
+// 
+// 	for(int i = 0; i < arg.trajLength; i++){
+// 		evolveGaugeField(gField, mField, a11, arg);
+// 		
+// 		fetch_expanded(gField);
+// 		getForce(fField, gField, arg);
+// 		mFieldAuxil.fillZero();
+// 		evolveMomentum(mFieldAuxil, fField, g11, arg);
+// 		gFieldAuxil = gField;
+// 		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
+// 		fetch_expanded(gFieldAuxil);
+// 		getForce(fField, gFieldAuxil, arg);
+// 		evolveMomentum(mField, fField, 0.5, arg);
+// 
+// 		evolveGaugeField(gField, mField, b11, arg);
+// 	
+// 		fetch_expanded(gField);
+// 		getForce(fField, gField, arg);
+// 		mFieldAuxil.fillZero();
+// 		evolveMomentum(mFieldAuxil, fField, g11, arg);
+// 		gFieldAuxil = gField;
+// 		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
+// 		fetch_expanded(gFieldAuxil);
+// 		getForce(fField, gFieldAuxil, arg);
+// 		evolveMomentum(mField, fField, 0.5, arg);
+// 
+// 		evolveGaugeField(gField, mField, a11, arg);
+// 	}
 
 }
 
