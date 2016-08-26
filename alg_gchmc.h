@@ -35,21 +35,11 @@ using namespace std;
 
 #define SU3_NUM_OF_GENERATORS 8
 
-class rePort
-{
+class rePort{
 public:
 	ostream *os;
 	rePort(){
 		os = &cout;
-	}
-	rePort(const string &str){
-		if(getIdNode() == 0) os = new ofstream(str.c_str(), ios::app);
-	}
-	~rePort(){
-		if(os == &cout){}
-		else{
-			if(getIdNode() == 0) delete os;
-		}
 	}
 };
 
@@ -71,7 +61,6 @@ inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field,
 		// forward declearation
 
 static const double invSqrt2 = 1. / sqrt(2.);
-static const double xi = 0.1931833;
 
 inline vector<Matrix> initGenerator(){
 	Matrix T1, T2, T3, T4, T5, T6, T7, T8;
@@ -462,43 +451,43 @@ inline void evolveGaugeField(Field<Matrix> &gField,
 
 inline void forceGradientIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 				const argCHmcWilson &arg){
-//	assert(isMatchingGeo(gField.geo, mField.geo));
+     assert(isMatchingGeo(gField.geo, mField.geo));
+     
+	const double a11 = (3. - sqrt(3.)) * arg.dt / 6.;
+	const double b11 = arg.dt / sqrt(3.);
+	const double g11 = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
 	
-// 	const double a11 = (3. - sqrt(3.)) * arg.dt / 6.;
-// 	const double b11 = arg.dt / sqrt(3.);
-// 	const double g11 = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
-// 	
-// 	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
-// 	static Field<Matrix> mFieldAuxil; mFieldAuxil.init(mField.geo);
-// 	static Field<Matrix> fField; fField.init(mField.geo);
-// 
-// 	for(int i = 0; i < arg.trajLength; i++){
-// 		evolveGaugeField(gField, mField, a11, arg);
-// 		
-// 		fetch_expanded(gField);
-// 		getForce(fField, gField, arg);
-// 		mFieldAuxil.fillZero();
-// 		evolveMomentum(mFieldAuxil, fField, g11, arg);
-// 		gFieldAuxil = gField;
-// 		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-// 		fetch_expanded(gFieldAuxil);
-// 		getForce(fField, gFieldAuxil, arg);
-// 		evolveMomentum(mField, fField, 0.5, arg);
-// 
-// 		evolveGaugeField(gField, mField, b11, arg);
-// 	
-// 		fetch_expanded(gField);
-// 		getForce(fField, gField, arg);
-// 		mFieldAuxil.fillZero();
-// 		evolveMomentum(mFieldAuxil, fField, g11, arg);
-// 		gFieldAuxil = gField;
-// 		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-// 		fetch_expanded(gFieldAuxil);
-// 		getForce(fField, gFieldAuxil, arg);
-// 		evolveMomentum(mField, fField, 0.5, arg);
-// 
-// 		evolveGaugeField(gField, mField, a11, arg);
-// 	}
+	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
+	static Field<Matrix> mFieldAuxil; mFieldAuxil.init(mField.geo);
+	static Field<Matrix> fField; fField.init(mField.geo);
+
+	for(int i = 0; i < arg.trajLength; i++){
+		evolveGaugeField(gField, mField, a11, arg);
+		
+		fetch_expanded(gField);
+		getForce(fField, gField, arg);
+		mFieldAuxil.fillZero();
+		evolveMomentum(mFieldAuxil, fField, g11, arg);
+		gFieldAuxil = gField;
+		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
+		fetch_expanded(gFieldAuxil);
+		getForce(fField, gFieldAuxil, arg);
+		evolveMomentum(mField, fField, 0.5 * arg.dt, arg);
+
+		evolveGaugeField(gField, mField, b11, arg);
+	
+		fetch_expanded(gField);
+		getForce(fField, gField, arg);
+		mFieldAuxil.fillZero();
+		evolveMomentum(mFieldAuxil, fField, g11, arg);
+		gFieldAuxil = gField;
+		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
+		fetch_expanded(gFieldAuxil);
+		getForce(fField, gFieldAuxil, arg);
+		evolveMomentum(mField, fField, 0.5 * arg.dt, arg);
+
+		evolveGaugeField(gField, mField, a11, arg);
+	}
 
 }
 
@@ -587,8 +576,7 @@ inline void initMomentum(Field<Matrix> &mField){
 	}}
 }
 
-inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, 
-			const rePort &re){
+inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFile){
 	TIMER("algCHmcWilson::runHMC()");
 
 	RngState globalRngState("By the witness of the martyrs.");
@@ -606,15 +594,11 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg,
 	bool doesAccept;
 	int numAccept = 0, numReject = 0;
 
-	// report << "LALA" << endl;
-	report << "LALA";
-	report << endl;
-
 	for(int i = 0; i < arg.numTraj; i++){
 		initMomentum(mField);
 		
 		oldH = getHamiltonian(gField, mField, arg);
-		LeapFrogIntegrator(gField, mField, arg);
+		forceGradientIntegrator(gField, mField, arg);
 		newH = getHamiltonian(gField, mField, arg);
 	
 		dieRoll = uRandGen(globalRngState);
@@ -648,10 +632,16 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg,
 		avgPlaq = avg_plaquette(gField);
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
-		re << i + 1 << "\t"
-			<< acceptProbability << "\t"
-			<< avgPlaq << "\t"
-			<< doesAccept << endl;
+		if(getIdNode() == 0){
+			fprintf(pFile, "%i\t%.6e\t%.6e\t%i\n", i + 1, 
+				acceptProbability, avgPlaq, doesAccept);
+			fflush(pFile);
+		}
+	}
+
+	if(getIdNode() == 0){
+		fprintf(pFile, "Accept Rate = %.3f\n", 
+		(double)numAccept / (numAccept + numReject));
 	}
 }
 
