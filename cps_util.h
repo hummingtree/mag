@@ -171,6 +171,33 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 
 }
 
+void import_config_nersc(Field<Matrix> &field, const string importAddr,
+                        const int num_of_reading_threads = 0,
+			const bool doesSkipThird = false){
+	if(doesSkipThird){
+		Geometry geo_;
+		geo_.init(field.geo);
+		Field<MatrixTruncatedSU3> gf_qlat_trunc;
+		gf_qlat_trunc.init(geo_);
+
+		sophisticated_serial_read(gf_qlat_trunc, importAddr, 
+						num_of_reading_threads);
+
+		for(long index = 0; index < geo_.localVolume(); index++){
+			Coordinate x; geo_.coordinateFromIndex(x, index);
+			for(int mu = 0; mu < DIM; mu++){
+				memcpy((void *)(field.getElems(x).data() + mu), 
+				(void *)(gf_qlat_trunc.getElemsConst(x).data() + mu), 
+				sizeof(MatrixTruncatedSU3));
+			}
+		}
+
+		reunitarize(field);
+	}else{
+		sophisticated_serial_read(field, importAddr, num_of_reading_threads);
+	}
+}
+
 void setDoArg(DoArg& do_arg, const int totalSite[4])
 {
 	do_arg.x_sites = totalSite[0];

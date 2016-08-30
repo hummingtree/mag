@@ -320,6 +320,7 @@ public:
 	int numTraj;
 	double beta;
 	double dt;
+	gAction gA;
 };
 
 inline int isConstrained(const Coordinate &x, int mu, int mag)
@@ -352,6 +353,7 @@ inline int isConstrained(const Coordinate &x, int mu, int mag)
 
 inline void getForce(Field<Matrix> &fField, const Field<Matrix> &gField,
 			const argCHmcWilson &arg){
+	TIMER("getFoece()");
 	assert(isMatchingGeo(fField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < fField.geo.localVolume(); index++){
@@ -374,17 +376,17 @@ inline void getForce(Field<Matrix> &fField, const Field<Matrix> &gField,
 					- mStaple1 * gField.getElemsConst(x)[mu];
 				break;
 			}
-			// case 100: force.ZeroMatrix(); break;
+			case 100: mTemp.ZeroMatrix(); break;
 		
 			// test case start
-			case 100: {
-				getStapleDagger(mStaple1, gField, x, mu);
-				mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
-				break;
-			} 
-			// test case end
+		// 	case 100: {
+		// 		getStapleDagger(mStaple1, gField, x, mu);
+		// 		mTemp = mStaple1 * gField.getElemsConst(x)[mu] * -1.;
+		// 		break;
+		// 	} 
+		// 	// test case end
 	
-			default: assert(false);
+		 	default: assert(false);
 			}
 	
 			mTemp.TrLessAntiHermMatrix(); 
@@ -427,7 +429,7 @@ inline void evolveGaugeField(Field<Matrix> &gField,
 				U = mL * U;
 				break;
 			}
-			case 100: // test case
+			// case 100: // test case
 			case 1: {
 				LieA2LieG(mL, mField.getElemsConst(y)[mu] * dt);
 				LieA2LieG(mR, mField.getElemsConst(x)[mu] * -dt);
@@ -439,61 +441,59 @@ inline void evolveGaugeField(Field<Matrix> &gField,
 				U = U * mR;
 			break;
 			}
-	// 		case 100: {
-	// 			LieA2LieG(mL, mField.getElemsConst(y)[mu] * dt);
-	// 			U = mL * U;
-	// 			break;
-	// 		}
+			case 100: {
+				LieA2LieG(mL, mField.getElemsConst(y)[mu] * dt);
+				U = mL * U;
+				break;
+			}
 			default: assert(false);
 			}
 	}}
 }
 
 inline void forceGradientIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-				const argCHmcWilson &arg){
-     assert(isMatchingGeo(gField.geo, mField.geo));
-     
-	const double a11 = (3. - sqrt(3.)) * arg.dt / 6.;
-	const double b11 = arg.dt / sqrt(3.);
-	const double g11 = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
+				const argCHmcWilson &arg, Chart<Matrix> &chart){
+    	TIMER("forceGradientIntegrator()"); 
+
+	assert(isMatchingGeo(gField.geo, mField.geo));
+	const double alpha = (3. - sqrt(3.)) * arg.dt / 6.;
+	const double beta = arg.dt / sqrt(3.);
+	const double gamma = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
 	
 	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
-	static Field<Matrix> mFieldAuxil; mFieldAuxil.init(mField.geo);
 	static Field<Matrix> fField; fField.init(mField.geo);
 
-	for(int i = 0; i < arg.trajLength; i++){
-		evolveGaugeField(gField, mField, a11, arg);
-		
-		fetch_expanded(gField);
-		getForce(fField, gField, arg);
-		mFieldAuxil.fillZero();
-		evolveMomentum(mFieldAuxil, fField, g11, arg);
-		gFieldAuxil = gField;
-		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-		fetch_expanded(gFieldAuxil);
-		getForce(fField, gFieldAuxil, arg);
-		evolveMomentum(mField, fField, 0.5 * arg.dt, arg);
-
-		evolveGaugeField(gField, mField, b11, arg);
+	evolveGaugeField(gField, mField, alpha, arg);
 	
-		fetch_expanded(gField);
+	for(int i = 0; i < arg.trajLength; i++){
+		fetch_expanded_chart(gField, chart);
 		getForce(fField, gField, arg);
-		mFieldAuxil.fillZero();
-		evolveMomentum(mFieldAuxil, fField, g11, arg);
 		gFieldAuxil = gField;
-		evolveGaugeField(gFieldAuxil, mFieldAuxil, 1., arg);
-		fetch_expanded(gFieldAuxil);
+		evolveGaugeField(gFieldAuxil, fField, gamma, arg);
+		fetch_expanded_chart(gFieldAuxil, chart);
 		getForce(fField, gFieldAuxil, arg);
 		evolveMomentum(mField, fField, 0.5 * arg.dt, arg);
 
-		evolveGaugeField(gField, mField, a11, arg);
-	}
+		evolveGaugeField(gField, mField, beta, arg);
+	
+		fetch_expanded_chart(gField, chart);
+		getForce(fField, gField, arg);
+		gFieldAuxil = gField;
+		evolveGaugeField(gFieldAuxil, fField, gamma, arg);
+		fetch_expanded_chart(gFieldAuxil, chart);
+		getForce(fField, gFieldAuxil, arg);
+		evolveMomentum(mField, fField, 0.5 * arg.dt, arg);
+
+		if(i < arg.trajLength - 1) 
+			evolveGaugeField(gField, mField, 2. * alpha, arg);
+		else evolveGaugeField(gField, mField, alpha, arg);
+	}	
 
 }
 
-inline void LeapFrogIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
+inline void leapFrogIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 				const argCHmcWilson &arg){
-	TIMER("LeapFrogIntegrator()");
+	TIMER("leapFrogIntegrator()");
 	assert(isMatchingGeo(gField.geo, mField.geo));
 	Geometry geo_; 
 	geo_.init(gField.geo.geon, gField.geo.multiplicity, gField.geo.nodeSite);
@@ -529,8 +529,8 @@ inline double getHamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
 		for(int mu = 0; mu < DIM; mu++){
 			Coordinate x; mField.geo.coordinateFromIndex(x, index);
 			switch(isConstrained(x, mu, arg.mag)){
-				// case 100: break;
-				case 100: // test case
+				case 100: break;
+				// case 100: // test case
 				case 0:
 				case 1:
 				case 10:{
@@ -578,6 +578,8 @@ inline void initMomentum(Field<Matrix> &mField){
 
 inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFile){
 	TIMER("algCHmcWilson::runHMC()");
+	assert(pFile != NULL);
+	assert(arg.numTraj > 20);
 
 	RngState globalRngState("By the witness of the martyrs.");
 
@@ -585,7 +587,10 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 	Geometry geoLocal; geoLocal.copyOnlyLocal(gFieldExt.geo);
 	Field<Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
 	Field<Matrix> mField; mField.init(geoLocal);
-	
+
+	Chart<Matrix> chart;
+	produce_chart_envelope(chart, gFieldExt.geo, arg.gA);
+
 	double oldH, newH;
 	double dieRoll;
 	double deltaH, percentDeltaH;
@@ -594,11 +599,14 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 	bool doesAccept;
 	int numAccept = 0, numReject = 0;
 
+
 	for(int i = 0; i < arg.numTraj; i++){
 		initMomentum(mField);
 		
 		oldH = getHamiltonian(gField, mField, arg);
-		forceGradientIntegrator(gField, mField, arg);
+		// leapFrogIntegrator(gField, mField, arg);
+		forceGradientIntegrator(gField, mField, arg, chart);
+		
 		newH = getHamiltonian(gField, mField, arg);
 	
 		dieRoll = uRandGen(globalRngState);
@@ -609,16 +617,23 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		MPI_Bcast((void *)&doesAccept, 1, MPI_BYTE, 0, getComm());
 		// make sure that all the node make the same decision.
 		
-		if(doesAccept){
+		if(i < 20){
 			report << "End trajectory " << i + 1
-				<< ": ACCEPT trajectory." << endl;
-			numAccept++;
+				<< ":\tFORCE ACCEPT." << endl;
 			gFieldExt = gField;
-		}else{			
-			report << "End trajectory " << i + 1
-				<< ": REJECT trajectory." << endl;
-			numReject++;
-			gField = gFieldExt;
+			doesAccept = true;
+		}else{
+			if(doesAccept){
+				report << "End trajectory " << i + 1
+					<< ":\tACCEPT." << endl;
+				numAccept++;
+				gFieldExt = gField;
+			}else{
+				report << "End trajectory " << i + 1
+					<< ":\tREJECT." << endl;
+				numReject++;
+				gField = gFieldExt;	
+			}	
 		}
 		
 		report << "old Hamiltonian =\t" << oldH << endl;
@@ -633,8 +648,8 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
 		if(getIdNode() == 0){
-			fprintf(pFile, "%i\t%.6e\t%.6e\t%i\n", i + 1, 
-				acceptProbability, avgPlaq, doesAccept);
+			fprintf(pFile, "%i\t%.6e\t%.6e\t%.6e\t%i\n", i + 1, 
+				abs(deltaH), acceptProbability, avgPlaq, doesAccept);
 			fflush(pFile);
 		}
 	}
