@@ -37,13 +37,26 @@ inline double avg_plaquette(const qlat::Field<cps::Matrix> &gauge_field_qlat);
 
 extern MPI_Comm QMP_COMM_WORLD;
 
-void reunitarize(Field<Matrix> &field){
-#pragma omp parallel for
-                for(long index = 0; index < field.geo.localVolume(); index++){
-                        Coordinate x; field.geo.coordinateFromIndex(x, index);
-                        for(int mu = 0; mu < field.geo.multiplicity; mu++){
-				field.getElems(x)[mu].Unitarize();
-		}}	
+double norm(const Matrix &m){
+	double sum = 0.;
+	for(int i = 0; i < 9; i++){
+		sum += norm(m[i]); // squared norm
+	}
+	return sqrt(sum);
+}
+
+double reunitarize(Field<Matrix> &field){
+	double maxDev = 0.;
+	Matrix oldElem;
+        for(long index = 0; index < field.geo.localVolume(); index++){
+                Coordinate x; field.geo.coordinateFromIndex(x, index);
+                for(int mu = 0; mu < field.geo.multiplicity; mu++){
+			Matrix &newElem = field.getElems(x)[mu];
+			oldElem = newElem;
+			newElem.Unitarize();
+			maxDev = max(maxDev, norm(newElem - oldElem));
+	}}
+	return maxDev;
 }
 
 void load_config(string lat_file)
@@ -61,12 +74,20 @@ void load_config(string lat_file)
     LatticeFactory::Destroy();
 }
 
+class argExport{
+public:
+	double beta;
+	int sequenceNum;
+	string ensembleLabel;
+};
+
 void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
+			const argExport &arg,
 			const bool doesSkipThird = false){
 	FILE *pExport;
 
 	Geometry geo_expand_one;
-	geo_expand_one.init(field.geo.geon, field.geo.multiplicity, \
+	geo_expand_one.init(field.geo.geon, field.geo.multiplicity,  
 		field.geo.nodeSite, Coordinate(1, 1, 1, 1), Coordinate(1, 1, 1, 1));
 
 	Field<Matrix> field_cp; field_cp.init(geo_expand_one);
@@ -110,11 +131,11 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 		header_stream << "CREATOR = RBC" << endl;
 		time_t now = std::time(NULL);	
 		header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
-		header_stream << "ENSEMBLE_LABEL = NOT yet implemented" << endl;
+		header_stream << "ENSEMBLE_LABEL = " << arg.ensembleLabel << endl;
 		header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
 		header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
-		header_stream << "SEQUENCE_NUMBER = NOT yet implemented" << endl;
-		header_stream << "BETA = NOT yet implemented" << endl; 
+		header_stream << "SEQUENCE_NUMBER = " << arg.sequenceNum << endl;
+		header_stream << "BETA = " << arg.beta << endl; 
 		header_stream << "END_HEADER" << endl;
 
 		fputs(header_stream.str().c_str(), pExport);
@@ -154,11 +175,11 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 			header_stream << "CREATOR = RBC" << endl;
 			time_t now = std::time(NULL);	
 			header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
-			header_stream << "ENSEMBLE_LABEL = NOT yet implemented" << endl;
+			header_stream << "ENSEMBLE_LABEL = " << arg.ensembleLabel << endl;
 			header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
 			header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
-			header_stream << "SEQUENCE_NUMBER = NOT yet implemented" << endl;
-			header_stream << "BETA = NOT yet implemented" << endl; 
+			header_stream << "SEQUENCE_NUMBER = " << arg.sequenceNum << endl;
+			header_stream << "BETA = " << arg.beta << endl; 
 			header_stream << "END_HEADER" << endl;
 
 			fputs(header_stream.str().c_str(), pExport);
@@ -174,6 +195,7 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 void import_config_nersc(Field<Matrix> &field, const string importAddr,
                         const int num_of_reading_threads = 0,
 			const bool doesSkipThird = false){
+
 	if(doesSkipThird){
 		Geometry geo_;
 		geo_.init(field.geo);

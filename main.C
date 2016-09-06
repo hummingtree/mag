@@ -42,7 +42,7 @@
 // #include<qmp.h>
 // #include<mpi.h>
 
-#define PARALLEL_READING_THREADS 1
+#define PARALLEL_READING_THREADS 16
 
 using namespace std;
 using namespace cps;
@@ -445,10 +445,7 @@ void File2QLAT2CPS(const Coordinate &totalSize, int mag,
 			algGCtrnHeatBath_.accpetRate();
 		}
 	}
-
 }
-
-
 
 bool doesFileExist(const char *fn){
   struct stat sb;
@@ -495,3 +492,4 @@ int main(int argc, char* argv[]){
 
 	return 0;
 }
+

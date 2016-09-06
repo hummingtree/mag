@@ -487,8 +487,8 @@ inline void forceGradientIntegrator(Field<Matrix> &gField, Field<Matrix> &mField
 		if(i < arg.trajLength - 1) 
 			evolveGaugeField(gField, mField, 2. * alpha, arg);
 		else evolveGaugeField(gField, mField, alpha, arg);
-	}	
-
+	}
+	report << "reunitarize: max deviation = " << reunitarize(gField) << endl;
 }
 
 inline void leapFrogIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
