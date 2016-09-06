@@ -35,27 +35,6 @@ using namespace std;
 
 #define SU3_NUM_OF_GENERATORS 8
 
-class rePort{
-public:
-	ostream *os;
-	rePort(){
-		os = &cout;
-	}
-};
-
-template<class T>
-const rePort& operator<<(const rePort &p, const T &data){
-	if(getIdNode() == 0) *(p.os) << data;
-	return p;
-}
-
-const rePort& operator<<(const rePort &p, ostream&(*func)(ostream&)){
-	if(getIdNode() == 0) *(p.os) << func;
-	return p;
-}
-
-static const rePort report;
-
 inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir);
 		// forward declearation
@@ -321,6 +300,8 @@ public:
 	double beta;
 	double dt;
 	gAction gA;
+	string exportAddress;
+	int outputInterval;
 };
 
 inline int isConstrained(const Coordinate &x, int mu, int mag)
@@ -643,7 +624,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		report << "Delta H =        \t" << deltaH << endl; 
 		report << "Delta H Ratio =  \t" << percentDeltaH << endl; 
 		
-		fetch_expanded(gField);
+		fetch_expanded_chart(gField, chart);
 		avgPlaq = avg_plaquette(gField);
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
@@ -652,7 +633,17 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 				abs(deltaH), acceptProbability, avgPlaq, doesAccept);
 			fflush(pFile);
 		}
+
+		if((i) % arg.outputInterval == 0){
+			argExport argExport_;
+			argExport_.beta = arg.beta;
+			argExport_.sequenceNum = i + 1;
+			argExport_.ensembleLabel = "constrained_hmc";
+			string address = arg.exportAddress + "ckpoint." + show(i + 1);
+			export_config_nersc(gFieldExt, address, argExport_, true);
+		}
 	}
+
 
 	if(getIdNode() == 0){
 		fprintf(pFile, "Accept Rate = %.3f\n", 

@@ -187,6 +187,7 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 		}
 
 		sophisticated_serial_write(field_write, exportAddr, true);
+		
 
 	}
 
