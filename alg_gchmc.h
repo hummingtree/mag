@@ -26,6 +26,7 @@
 #include <qlat/field.h>
 #include <qlat/field-io.h>
 #include <qlat/field-comm.h>
+#include <qlat/field-rng.h>
 
 #include "cps_util.h"
 
@@ -37,6 +38,7 @@ using namespace std;
 
 inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir);
+double reunitarize(Field<Matrix> &field);
 		// forward declearation
 
 static const double invSqrt2 = 1. / sqrt(2.);
@@ -300,7 +302,7 @@ public:
 	double beta;
 	double dt;
 	gAction gA;
-	string exportAddress;
+	string exportAddress; // config output
 	int outputInterval;
 };
 
@@ -580,7 +582,6 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 	bool doesAccept;
 	int numAccept = 0, numReject = 0;
 
-
 	for(int i = 0; i < arg.numTraj; i++){
 		initMomentum(mField);
 		
@@ -634,7 +635,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 			fflush(pFile);
 		}
 
-		if((i) % arg.outputInterval == 0){
+		if((i + 1) % arg.outputInterval == 0 && i + 1 > 40){
 			argExport argExport_;
 			argExport_.beta = arg.beta;
 			argExport_.sequenceNum = i + 1;
@@ -644,10 +645,10 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		}
 	}
 
-
 	if(getIdNode() == 0){
 		fprintf(pFile, "Accept Rate = %.3f\n", 
-		(double)numAccept / (numAccept + numReject));
+				(double)numAccept / (numAccept + numReject));
+		fflush(pFile);
 	}
 }
 

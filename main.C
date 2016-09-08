@@ -188,7 +188,7 @@ int main(int argc, char* argv[]){
 
 	for(int i = origin_start; i < origin_end; i += origin_interval){
 		argHMC.mag = mag_factor;
-		argHMC.trajLength = 12;
+		argHMC.trajLength = 11;
 		argHMC.numTraj = 200;
 		argHMC.beta = 6.05;
 		argHMC.dt = 1. / argHMC.trajLength;
