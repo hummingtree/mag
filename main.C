@@ -137,7 +137,7 @@ void hmc_in_qlat(const Coordinate &totalSize,
 		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
 
 //  start hmc 
-	 FILE *pFile = fopen("/bgusr/home/jtu/mag/data/alg_gchmc_test.dat", "a");
+	FILE *pFile = fopen("/bgusr/home/jtu/mag/data/alg_gchmc_test.dat", "a");
 
 	if(getIdNode() == 0){
 		time_t now = time(NULL);
@@ -168,6 +168,14 @@ bool doesFileExist(const char *fn){
   return 1 + stat(fn, &sb);
 }
 
+string str_printf(const char *format, ...){
+        char *cstr;
+        va_list args; va_start(args, format);
+        vasprintf(&cstr, format, args);
+        free(cstr);
+        return string(cstr);
+}
+
 int main(int argc, char* argv[]){
 	cout.precision(12);
 	cout.setf(ios::showpoint);
@@ -190,7 +198,7 @@ int main(int argc, char* argv[]){
 		argHMC.mag = mag_factor;
 		argHMC.trajLength = 11;
 		argHMC.numTraj = 200;
-		argHMC.beta = 6.05;
+		argHMC.beta = 5.55;
 		argHMC.dt = 1. / argHMC.trajLength;
 		argHMC.outputInterval = 10;
 		
@@ -204,7 +212,7 @@ int main(int argc, char* argv[]){
 		expanded_config = "/bgusr/home/jtu/config/"
 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 		"ckpoint_lat." + show((long)i) + "_mag" + show((long)mag_factor) + 
-		"_b6.05_WILSON/";
+		"_b" + str_printf("%.2f", argHMC.beta) + "_WILSON/";
 
 		mkdir(expanded_config.c_str(), 0777);	
 
