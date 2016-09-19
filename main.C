@@ -30,11 +30,8 @@
 #include <qlat/field-comm.h>
 #include <qlat/field-rng.h>
 
-#include "alg_gchmc.h"
-#include "alg_gchb.h"
+#include "field-hmc.h"
 #include "cps_util.h"
-#include "stat.h"
-
 
 // #include<qmp.h>
 // #include<mpi.h>
@@ -100,7 +97,7 @@ void hmc_in_qlat(const Coordinate &totalSize,
 	
 	import_config_nersc(gFieldOrigin, config_addr, 16, true);
 	fetch_expanded(gFieldOrigin);
- 	report << "average plaquette origin = \t" 
+ 	report << "AVERAGE Plaquette Original = \t" 
 		<< avg_plaquette(gFieldOrigin) << endl;
 
 	Geometry geoExpanded;
@@ -126,14 +123,14 @@ void hmc_in_qlat(const Coordinate &totalSize,
 						gFieldOrigin.getElemsConst(x)[mu]; 
 	}}	
 	syncNode();
-	report << "Field expansion finished." << std::endl;
+	report << "Field Expansion Finished." << std::endl;
 	
 	Chart<Matrix> chart;
 	produce_chart_envelope(chart, gFieldExpanded.geo, argHMC.gA);
 	
 	fetch_expanded(gFieldExpanded);
-	report << "average plaquette = \t" << avg_plaquette(gFieldExpanded) << endl;
-	report << "constrained plaquette = \t" 
+	report << "AVERAGE Plaquette =     \t" << avg_plaquette(gFieldExpanded) << endl;
+	report << "CONSTRAINED Plaquette = \t" 
 		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
 
 //  start hmc 
@@ -169,10 +166,9 @@ bool doesFileExist(const char *fn){
 }
 
 string str_printf(const char *format, ...){
-        char *cstr;
+        char cstr[512];
         va_list args; va_start(args, format);
-        vasprintf(&cstr, format, args);
-        free(cstr);
+	vsnprintf(cstr, sizeof(cstr), format, args);
         return string(cstr);
 }
 
@@ -186,7 +182,7 @@ int main(int argc, char* argv[]){
 	int mag_factor = 2;
 	
 	int origin_start = 300;
-	int origin_end = 700;
+	int origin_end = 680;
 	int origin_interval = 20; 
 
 	string cps_config;
@@ -196,12 +192,14 @@ int main(int argc, char* argv[]){
 
 	for(int i = origin_start; i < origin_end; i += origin_interval){
 		argHMC.mag = mag_factor;
-		argHMC.trajLength = 11;
+		argHMC.trajLength = 12;
 		argHMC.numTraj = 200;
-		argHMC.beta = 5.55;
+		argHMC.beta = 5.25;
 		argHMC.dt = 1. / argHMC.trajLength;
 		argHMC.outputInterval = 10;
-		
+		argHMC.forceAccept = 20;
+		argHMC.outputStart = 60;
+
 		gAction gA_; gA_.type = qlat::WILSON;
 		argHMC.gA = gA_;
 
@@ -222,7 +220,7 @@ int main(int argc, char* argv[]){
 	}
 
 	syncNode();
-	cout << "Program ended normally." << endl;
+	cout << "Program Ended Normally." << endl;
 
 	return 0;
 }

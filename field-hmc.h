@@ -28,18 +28,13 @@
 #include <qlat/field-comm.h>
 #include <qlat/field-rng.h>
 
-#include "cps_util.h"
+#include "field-matrix.h"
 
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
 #define SU3_NUM_OF_GENERATORS 8
-
-inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
-					const Coordinate &x, const vector<int> &dir);
-double reunitarize(Field<Matrix> &field);
-		// forward declearation
 
 static const double invSqrt2 = 1. / sqrt(2.);
 
@@ -86,136 +81,6 @@ inline vector<Matrix> initGenerator(){
 
 static const vector<Matrix> su3Generator = initGenerator();
 
-inline double avg_plaquette(const qlat::Field<Matrix> &gauge_field_qlat){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
-	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 for(int nu = 0; nu < mu; nu++){	
-		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
-			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
-			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
-			mul = mul * dag1;
-			x_qlat = x_qlat - dir_vec[nu];
-			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
-			mul = mul * dag2;
-
-			node_sum += mul.ReTr();
-		 }}
-	}
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum / (18. * getNumNode() * geo_.localVolume());
-}
-
-inline double totalPlaq(const qlat::Field<Matrix> &gauge_field_qlat){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
-	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 for(int nu = 0; nu < mu; nu++){	
-		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
-			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
-			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
-			mul = mul * dag1;
-			x_qlat = x_qlat - dir_vec[nu];
-			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
-			mul = mul * dag2;
-
-			node_sum += mul.ReTr();
-		 }}
-	}
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum;
-}
-
-inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-	double tr_node_sum = 0.;
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 	tr_node_sum += \
-				(gauge_field_qlat.getElemsConst(x_qlat)[mu]).ReTr();
-		 }
-	}
-	double tr_global_sum = 0.;
-	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return tr_global_sum / (12. * getNumNode() * geo_.localVolume());
-}
-
-inline double check_constrained_plaquette(
-				const qlat::Field<Matrix> &gauge_field_qlat,
-				int mag){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-	
-	long count = 0;
-	double node_sum = 0.;
-	for(int x0 = 0; x0 < geo_.nodeSite[0]; x0 += mag){
-	for(int x1 = 0; x1 < geo_.nodeSite[1]; x1 += mag){
-	for(int x2 = 0; x2 < geo_.nodeSite[2]; x2 += mag){
-	for(int x3 = 0; x3 < geo_.nodeSite[3]; x3 += mag){
-		Coordinate x(x0, x1, x2, x3);
-		for(int mu = 0; mu < DIM; mu++){
-		for(int nu = 0; nu < mu; nu++){
-			Matrix m;
-			vector<int> dir; dir.clear();
-			for(int i = 0; i < mag; i++) dir.push_back(mu);
-			for(int i = 0; i < mag; i++) dir.push_back(nu);
-			for(int i = 0; i < mag; i++) dir.push_back(mu + DIM);
-			for(int i = 0; i < mag; i++) dir.push_back(nu + DIM);
-			
-			getPathOrderedProd(m, gauge_field_qlat, x, dir);
-			
-			count++;
-			node_sum += m.ReTr();
-		}}
-	}}}}
-
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-
-	return global_sum / (3. * count * getNumNode());
-}
-
 inline void exp(Matrix &expM, const Matrix &M){
         Matrix mTemp2 = M, mTemp3;
 	for(int i = 9; i > 1; i--){
@@ -229,27 +94,6 @@ inline void LieA2LieG(Matrix &expiM, const Matrix &M){
 	// expiM = exp(i * M)
 	Matrix mTemp = M; mTemp *= qlat::Complex(0., 1.);
 	exp(expiM, mTemp);
-}
-
-inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
-					const Coordinate &x, const vector<int> &dir){
-	Matrix mul; mul.UnitMatrix();
-	Matrix dag;
-	Coordinate y(x);
-	int direction;
-	for(unsigned int i = 0; i < dir.size(); i++){
-		direction = dir[i];
-		assert(direction < DIM * 2 && direction > -1);
-		if(direction < DIM){
-			mul = mul * field.getElemsConst(y)[direction];
-			y[direction]++;
-		}else{
-			y[direction - DIM]--;
-			dag.Dagger(field.getElemsConst(y)[direction - DIM]);
-			mul = mul * dag;
-		}
-	}
-	prod = mul;
 }
 
 inline void getStapleDagger(Matrix &staple, const Field<Matrix> &field, 
@@ -304,6 +148,8 @@ public:
 	gAction gA;
 	string exportAddress; // config output
 	int outputInterval;
+	int forceAccept;
+	int outputStart;
 };
 
 inline int isConstrained(const Coordinate &x, int mu, int mag)
@@ -599,7 +445,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		MPI_Bcast((void *)&doesAccept, 1, MPI_BYTE, 0, getComm());
 		// make sure that all the node make the same decision.
 		
-		if(i < 20){
+		if(i < arg.forceAccept){
 			report << "End trajectory " << i + 1
 				<< ":\tFORCE ACCEPT." << endl;
 			gFieldExt = gField;
@@ -635,7 +481,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 			fflush(pFile);
 		}
 
-		if((i + 1) % arg.outputInterval == 0 && i + 1 > 40){
+		if((i + 1) % arg.outputInterval == 0 && i + 1 >= arg.outputStart){
 			argExport argExport_;
 			argExport_.beta = arg.beta;
 			argExport_.sequenceNum = i + 1;
