@@ -281,7 +281,7 @@ inline void evolveGaugeField(Field<Matrix> &gField,
 }
 
 inline void forceGradientIntegrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-				const argCHmcWilson &arg, Chart<Matrix> &chart){
+					const argCHmcWilson &arg, Chart<Matrix> &chart){
     	TIMER("forceGradientIntegrator()"); 
 
 	assert(isMatchingGeo(gField.geo, mField.geo));

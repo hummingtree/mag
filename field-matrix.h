@@ -17,7 +17,9 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-double norm(const Matrix &m){
+// So in principle this file only uses the Matrix class and its member functions in cps.
+
+inline double norm(const Matrix &m){
 	double sum = 0.;
 	for(int i = 0; i < 9; i++){
 		sum += norm(m[i]); // squared norm
@@ -25,7 +27,7 @@ double norm(const Matrix &m){
 	return sqrt(sum);
 }
 
-double reunitarize(Field<Matrix> &field){
+inline double reunitarize(Field<Matrix> &field){
 	double maxDev = 0.;
 	Matrix oldElem;
         for(long index = 0; index < field.geo.localVolume(); index++){
@@ -150,9 +152,8 @@ inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	return tr_global_sum / (12. * getNumNode() * geo_.localVolume());
 }
 
-inline double check_constrained_plaquette(
-				const qlat::Field<Matrix> &gauge_field_qlat,
-				int mag){
+inline double check_constrained_plaquette(const qlat::Field<Matrix> &gauge_field_qlat,
+						int mag){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
@@ -197,9 +198,9 @@ public:
 	string ensembleLabel;
 };
 
-void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
-			const argExport &arg,
-			const bool doesSkipThird = false){
+inline void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
+					const argExport &arg,
+					const bool doesSkipThird = false){
 	FILE *pExport;
 
 	Geometry geo_expand_one;
@@ -309,9 +310,9 @@ void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
 
 }
 
-void import_config_nersc(Field<Matrix> &field, const string importAddr,
-                        const int num_of_reading_threads = 0,
-			const bool doesSkipThird = false){
+inline void import_config_nersc(Field<Matrix> &field, const string importAddr,
+                        		const int num_of_reading_threads = 0,
+					const bool doesSkipThird = false){
 
 	if(doesSkipThird){
 		Geometry geo_;
