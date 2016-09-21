@@ -181,7 +181,7 @@ int main(int argc, char* argv[]){
 	Coordinate total_size(24, 24, 24, 64);
 	int mag_factor = 2;
 	
-	int origin_start = 300;
+	int origin_start = 320;
 	int origin_end = 680;
 	int origin_interval = 20; 
 
@@ -192,9 +192,9 @@ int main(int argc, char* argv[]){
 
 	for(int i = origin_start; i < origin_end; i += origin_interval){
 		argHMC.mag = mag_factor;
-		argHMC.trajLength = 12;
+		argHMC.trajLength = 11;
 		argHMC.numTraj = 200;
-		argHMC.beta = 5.25;
+		argHMC.beta = 5.40;
 		argHMC.dt = 1. / argHMC.trajLength;
 		argHMC.outputInterval = 10;
 		argHMC.forceAccept = 20;
