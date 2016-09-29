@@ -87,8 +87,7 @@ void hmc_in_qlat(const Coordinate &totalSize,
 // 				argHMC.mag * GJP.NodeSites(3) * SizeT());
 	begin(&argc, &argv);
 
-	Geometry geoOrigin;
-        geoOrigin.init(totalSize, DIM);
+	Geometry geoOrigin; geoOrigin.init(totalSize, DIM);
 	Coordinate expansion(1, 1, 1, 1);
 	geoOrigin.resize(expansion, expansion);
 
@@ -97,8 +96,8 @@ void hmc_in_qlat(const Coordinate &totalSize,
 	
 	import_config_nersc(gFieldOrigin, config_addr, 16, true);
 	fetch_expanded(gFieldOrigin);
- 	report << "AVERAGE Plaquette Original = \t" 
-		<< avg_plaquette(gFieldOrigin) << endl;
+ 	report << "Coarse Configuration: " << config_addr << endl;
+	report << "AVERAGE Plaquette Original = \t" << avg_plaquette(gFieldOrigin) << endl;
 
 	Geometry geoExpanded;
 	geoExpanded.init(argHMC.mag * totalSize, DIM);
@@ -155,8 +154,8 @@ void hmc_in_qlat(const Coordinate &totalSize,
 	runHMC(gFieldExpanded, argHMC, pFile);
 	
 	fetch_expanded(gFieldExpanded);
-	report << "average plaquette = \t" << avg_plaquette(gFieldExpanded) << endl;
-	report << "constrained plaquette = \t" 
+	report << "AVERAGE Plaquette =     \t" << avg_plaquette(gFieldExpanded) << endl;
+	report << "CONSTRAINED Plaquette = \t" 
 		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
 }
 
@@ -181,16 +180,16 @@ int main(int argc, char* argv[]){
 	Coordinate total_size(24, 24, 24, 64);
 	int mag_factor = 2;
 	
-	int origin_start = 320;
-	int origin_end = 680;
-	int origin_interval = 20; 
+	int origin_start = 		680;
+	int origin_end = 		680;
+	int origin_interval = 	20; 
 
 	string cps_config;
 	string expanded_config;
 
 	argCHmcWilson argHMC;
 
-	for(int i = origin_start; i < origin_end; i += origin_interval){
+	for(int i = origin_start; i <= origin_end; i += origin_interval){
 		argHMC.mag = mag_factor;
 		argHMC.trajLength = 11;
 		argHMC.numTraj = 200;
@@ -220,7 +219,7 @@ int main(int argc, char* argv[]){
 	}
 
 	syncNode();
-	cout << "Program Ended Normally." << endl;
+	cout << "[" << getIdNode() << "]: ""Program Ended Normally." << endl;
 
 	return 0;
 }
