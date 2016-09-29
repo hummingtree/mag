@@ -385,6 +385,7 @@ inline double getHamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
 }
 
 inline void initMomentum(Field<Matrix> &mField){
+	TIMER("initMomemtum()");
 	long rnSize = mField.geo.localVolume() * \
 			mField.geo.multiplicity * SU3_NUM_OF_GENERATORS;
 	vector<double> omega(rnSize); rnFillingSHA256Gaussian(omega);
