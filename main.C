@@ -140,6 +140,7 @@ void hmc_in_qlat(const Coordinate &totalSize,
 		fputs("# ", pFile);
 		fputs(ctime(&now), pFile);
 		fputs(show(gFieldExpanded.geo).c_str(), pFile); fputs("\n", pFile);
+		fprintf(pFile, "# Coarse Config: %s\n", config_addr.c_str());
 		fprintf(pFile, "# mag =        %i\n", argHMC.mag);
 		fprintf(pFile, "# trajLength = %i\n", argHMC.trajLength);
 		fprintf(pFile, "# numTraj =    %i\n", argHMC.numTraj);
@@ -180,7 +181,7 @@ int main(int argc, char* argv[]){
 	Coordinate total_size(24, 24, 24, 64);
 	int mag_factor = 2;
 	
-	int origin_start = 		680;
+	int origin_start = 		380;
 	int origin_end = 		680;
 	int origin_interval = 	20; 
 
@@ -192,7 +193,7 @@ int main(int argc, char* argv[]){
 	for(int i = origin_start; i <= origin_end; i += origin_interval){
 		argHMC.mag = mag_factor;
 		argHMC.trajLength = 11;
-		argHMC.numTraj = 200;
+		argHMC.numTraj = 1600;
 		argHMC.beta = 5.40;
 		argHMC.dt = 1. / argHMC.trajLength;
 		argHMC.outputInterval = 10;
@@ -206,10 +207,12 @@ int main(int argc, char* argv[]){
 		"b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
 		"ckpoint_lat." + show((long)i);
 
-		expanded_config = "/bgusr/home/jtu/config/"
-		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
-		"ckpoint_lat." + show((long)i) + "_mag" + show((long)mag_factor) + 
-		"_b" + str_printf("%.2f", argHMC.beta) + "_WILSON/";
+// 		expanded_config = "/bgusr/home/jtu/config/"
+// 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
+// 		"ckpoint_lat." + show((long)i) + "_mag" + show((long)mag_factor) + 
+// 		"_b" + str_printf("%.2f", argHMC.beta) + "_WILSON/";
+
+		expanded_config = "";
 
 		mkdir(expanded_config.c_str(), 0777);	
 

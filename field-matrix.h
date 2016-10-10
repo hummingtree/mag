@@ -12,6 +12,7 @@
 #include <qlat/field.h>
 #include <qlat/field-comm.h>
 #include <qlat/field-rng.h>
+#include <qlat/field-io.h>
 
 using namespace cps;
 using namespace qlat;

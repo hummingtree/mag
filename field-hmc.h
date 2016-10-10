@@ -381,6 +381,7 @@ inline double getHamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
 	double kineticEnergy = globalSum / 2.;
 	fetch_expanded(gField);
 	double potentialEnergy = -totalPlaq(gField) * arg.beta / 3.;
+	report << "energy = " << potentialEnergy << endl;
 	return kineticEnergy + potentialEnergy;
 }
 
@@ -477,7 +478,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
 		if(getIdNode() == 0){
-			fprintf(pFile, "%i\t%.6e\t%.6e\t%.6e\t%i\n", i + 1, 
+			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\n", i + 1, 
 				abs(deltaH), acceptProbability, avgPlaq, doesAccept);
 			fflush(pFile);
 		}
@@ -487,8 +488,10 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 			argExport_.beta = arg.beta;
 			argExport_.sequenceNum = i + 1;
 			argExport_.ensembleLabel = "constrained_hmc";
-			string address = arg.exportAddress + "ckpoint." + show(i + 1);
-			export_config_nersc(gFieldExt, address, argExport_, true);
+			if(arg.exportAddress.size() > 0){
+				string address = arg.exportAddress + "ckpoint." + show(i + 1);
+				export_config_nersc(gFieldExt, address, argExport_, true);
+			}
 		}
 	}
 
