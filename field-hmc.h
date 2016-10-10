@@ -166,6 +166,8 @@ inline int isConstrained(const Coordinate &x, int mu, int mag)
 
 	// debug end
 
+	if(!mag) return 0; // this is not a constrained evolution: always return 0;
+
 	bool isConstrained_ = true;
 	for(int i = 0; i < 4; i++){
 		if(i == mu) continue;
