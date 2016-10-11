@@ -494,6 +494,8 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 				string address = arg.exportAddress + "ckpoint." + show(i + 1);
 				export_config_nersc(gFieldExt, address, argExport_, true);
 			}
+			if(getIdNode() == 0) printf("ACCEPT RATE = %.3f\n",
+										(double)numAccept / (numAccept + numReject));
 		}
 	}
 
