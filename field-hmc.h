@@ -383,27 +383,31 @@ inline double getHamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
 	double kineticEnergy = globalSum / 2.;
 	fetch_expanded(gField);
 	double potentialEnergy = -totalPlaq(gField) * arg.beta / 3.;
-	report << "energy = " << potentialEnergy << endl;
+	report << "POTENTIAL ENERGY = " << potentialEnergy << endl;
 	return kineticEnergy + potentialEnergy;
 }
 
 inline void initMomentum(Field<Matrix> &mField){
 	TIMER("initMomemtum()");
-	long rnSize = mField.geo.localVolume() * \
-			mField.geo.multiplicity * SU3_NUM_OF_GENERATORS;
-	vector<double> omega(rnSize); rnFillingSHA256Gaussian(omega);
+
+	using namespace qlat;
+	static bool initialized = false;
+	static Geometry rng_geo;
+	static RngField rng_field;
+	if(initialized == false){
+		rng_geo.init(mField.geo.geon, 1, mField.geo.nodeSite);
+		rng_field.init(rng_geo, RngState("Ich liebe dich."));
+		initialized = true;
+	}
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.localVolume(); index++){
 		Coordinate x; mField.geo.coordinateFromIndex(x, index);
 		Matrix mTemp;
-		long fund;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
-			fund = (index * mField.geo.multiplicity + mu) * \
-							SU3_NUM_OF_GENERATORS;
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
-				mTemp += su3Generator[a] * omega[fund + a];
+				mTemp += su3Generator[a] * gRandGen(rng_field.getElem(x));
 			}
 			mField.getElems(x)[mu] = mTemp;
 	}}

@@ -158,6 +158,9 @@ void hmc_in_qlat(const Coordinate &totalSize,
 	report << "AVERAGE Plaquette =     \t" << avg_plaquette(gFieldExpanded) << endl;
 	report << "CONSTRAINED Plaquette = \t" 
 		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
+	
+	Timer::display();
+
 }
 
 bool doesFileExist(const char *fn){

@@ -89,6 +89,6 @@ cps:
 	$(MAKE) -C $(BUILDDIR)
 
 clean:
-	rm -f *.dat *.o  $(BIN)
-	rm -f ../regressions/*$(me).dat
-	rm -f ../regressions/*$(me).checklog
+	rm -f *.dat *.o  $(BIN) || true
+	rm -f ../regressions/*$(me).dat || true
+	rm -f ../regressions/*$(me).checklog || true
