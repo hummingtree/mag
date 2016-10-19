@@ -413,6 +413,32 @@ inline void initMomentum(Field<Matrix> &mField){
 	}}
 }
 
+inline double derivative(const Field<Matrix> &gField, Coordinate &local, int mu, int a){
+	Matrix &U = gField.getElemsConst(local)[mu];
+	Matrix V_dagger; getStapleDagger(V_dagger, gField, local, mu);
+	Matrix temp = su3Generator[a] * U * V_dagger * qlat::Complex(0., 1.);
+	return temp.ReTr();
+}
+
+inline double derivative_sum(Field<Matrix> &gField, const argCHmcWilson &arg){
+	fetch_expanded(gField);
+	double local_sum = 0.;
+	for(int x = 0; x < gField.geo.nodeSite[0]; x += arg.mag){
+	for(int y = 0; y < gField.geo.nodeSite[1]; y += arg.mag){
+	for(int z = 0; z < gField.geo.nodeSite[2]; z += arg.mag){
+	for(int t = 0; t < gField.geo.nodeSite[3]; t += arg.mag){
+	for(int mu = 0; mu < DIM; mu++){
+	for(int a = 0; a < 8; a++){
+		Coordinate coor(x, y, z, t);
+		local_sum += derivative(gField, coor, mu, a);
+	}}}}}}
+
+	double global_sum;
+	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+
+	return global_sum;
+}
+
 inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFile){
 	TIMER("algCHmcWilson::runHMC()");
 	assert(pFile != NULL);
@@ -483,9 +509,12 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		avgPlaq = avg_plaquette(gField);
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
+		double dv_sum = derivative_sum(gField, arg);
+		report << "FINE DERIVATIVE =\t" << dv_sum << endl;
+
 		if(getIdNode() == 0){
-			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\n", i + 1, 
-				abs(deltaH), acceptProbability, avgPlaq, doesAccept);
+			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%.12e\t%i\n", i + 1, 
+				abs(deltaH), acceptProbability, avgPlaq, dv_sum, doesAccept);
 			fflush(pFile);
 		}
 
@@ -508,5 +537,7 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 				(double)numAccept / (numAccept + numReject));
 		fflush(pFile);
 	}
+
+	Timer::display();
 }
 
