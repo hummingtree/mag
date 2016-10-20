@@ -413,11 +413,34 @@ inline void initMomentum(Field<Matrix> &mField){
 	}}
 }
 
-inline double derivative(const Field<Matrix> &gField, Coordinate &local, int mu, int a){
-	Matrix &U = gField.getElemsConst(local)[mu];
-	Matrix V_dagger; getStapleDagger(V_dagger, gField, local, mu);
+inline double derivative(const Field<Matrix> &gField, 
+							const Coordinate &x, int mu, int a){
+	Matrix &U = gField.getElemsConst(x)[mu];
+	Matrix V_dagger; getStapleDagger(V_dagger, gField, x, mu);
 	Matrix temp = su3Generator[a] * U * V_dagger * qlat::Complex(0., 1.);
 	return temp.ReTr();
+}
+
+inline void derivative_list(vector<vector<double> > &output, Field<Matrix> &gField, 
+								const argCHmcWilson &arg){
+	long alpha_size = product(gField.geo.nodeSite) * DIM * SU3_NUM_OF_GENERATORS;
+	assert(output.size() >= alpha_size);
+	
+	fetch_expanded(gField);
+	
+	long i = 0;
+	for(int t = 0; t < gField.geo.nodeSite[3]; t += arg.mag){
+	for(int z = 0; z < gField.geo.nodeSite[2]; z += arg.mag){
+	for(int y = 0; y < gField.geo.nodeSite[1]; y += arg.mag){
+	for(int x = 0; x < gField.geo.nodeSite[0]; x += arg.mag){
+	for(int mu = 0; mu < DIM; mu++){
+	for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
+	
+		Coordinate coordinate(x, y, z, t);
+		output[i].push_back(derivative(gField, coordinate, mu, a));
+		i++;
+	
+	}}}}}}
 }
 
 inline double derivative_sum(Field<Matrix> &gField, const argCHmcWilson &arg){
@@ -453,6 +476,9 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 
 	Chart<Matrix> chart;
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gA);
+
+//	long alpha_size = product(gFieldExt.geo.nodeSite) * DIM * SU3_NUM_OF_GENERATORS;
+//	vector<vector<double> > dev_list; dev_list.resize(alpha_size);
 
 	double oldH, newH;
 	double dieRoll;
@@ -509,8 +535,8 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		avgPlaq = avg_plaquette(gField);
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
+//		derivative_list(dev_list, gField, arg);	
 		double dv_sum = derivative_sum(gField, arg);
-		report << "FINE DERIVATIVE =\t" << dv_sum << endl;
 
 		if(getIdNode() == 0){
 			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%.12e\t%i\n", i + 1, 
@@ -531,6 +557,15 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 										(double)numAccept / (numAccept + numReject));
 		}
 	}
+
+//	double ATC;
+//	vector<double> dev_val; dev_val.resize(alpha);
+//	vector<double> dev_err; dev_err.resize(alpha);
+//	for(long j = 0; j < alpha; j++){
+//		ATC = autoCorrelation(dev_list[j]);
+//		dev_err[j] = jackknife(dev_list[j].data(), dev_list[j].size(), 
+//									int(ceil(ATC)), dev_val[j]);
+//	}
 
 	if(getIdNode() == 0){
 		fprintf(pFile, "Accept Rate = %.3f\n", 
