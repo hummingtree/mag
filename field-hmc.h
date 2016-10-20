@@ -421,31 +421,31 @@ inline double derivative(const Field<Matrix> &gField,
 	return temp.ReTr();
 }
 
-inline void derivative_list(vector<vector<double> > &output, Field<Matrix> &gField, 
+inline void derivative_field(Field<vector<double> > &dField, Field<Matrix> &gField, 
 								const argCHmcWilson &arg){
-	long alpha_size = product(gField.geo.nodeSite) * DIM * SU3_NUM_OF_GENERATORS;
-	assert(output.size() >= alpha_size);
+	for(int i = 0; i < DIM; i++){
+		assert(gField.geo.nodeSite[i] % dField.geo.nodeSite[i] == 0); 
+	}
 	
 	fetch_expanded(gField);
-	
-	long i = 0;
-	for(int t = 0; t < gField.geo.nodeSite[3]; t += arg.mag){
-	for(int z = 0; z < gField.geo.nodeSite[2]; z += arg.mag){
-	for(int y = 0; y < gField.geo.nodeSite[1]; y += arg.mag){
-	for(int x = 0; x < gField.geo.nodeSite[0]; x += arg.mag){
-	for(int mu = 0; mu < DIM; mu++){
-	for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
-	
-		Coordinate coordinate(x, y, z, t);
-		output[i].push_back(derivative(gField, coordinate, mu, a));
-		i++;
-	
-	}}}}}}
+
+#pragma omp parallel for
+	for(long index = 0; index < dField.geo.localVolume(); index++){
+		Coordinate x; dField.geo.coordinateFromIndex(x, index);
+		int spin_color_index;
+		for(int mu = 0; mu < DIM; mu++){
+		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
+			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
+			dField.getElems(x)[spin_color_index].push_back(
+					derivative(gField, arg.mag * x, mu, a));
+		}}
+	}
 }
 
 inline double derivative_sum(Field<Matrix> &gField, const argCHmcWilson &arg){
 	fetch_expanded(gField);
 	double local_sum = 0.;
+	long count;
 	for(int x = 0; x < gField.geo.nodeSite[0]; x += arg.mag){
 	for(int y = 0; y < gField.geo.nodeSite[1]; y += arg.mag){
 	for(int z = 0; z < gField.geo.nodeSite[2]; z += arg.mag){
@@ -454,11 +454,13 @@ inline double derivative_sum(Field<Matrix> &gField, const argCHmcWilson &arg){
 	for(int a = 0; a < 8; a++){
 		Coordinate coor(x, y, z, t);
 		local_sum += derivative(gField, coor, mu, a);
+		count++;
 	}}}}}}
 
 	double global_sum;
 	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
 
+	report << "derivative_sum(): mag = " << arg.mag << "\tcount = " << count << endl; 
 	return global_sum;
 }
 
@@ -476,6 +478,14 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 
 	Chart<Matrix> chart;
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gA);
+
+	Coordinate total_size_coarse;
+	for(int i = 0; i < DIM; i++){
+		total_size_coarse[i] = geoLocal.totalSite(i) / arg.mag;
+	}
+	Geometry geo_coarse; 
+	geo_coarse.init(total_size_coarse, DIM * SU3_NUM_OF_GENERATORS);
+	Field<vector<double> > dField; dField.init(geo_coarse);
 
 //	long alpha_size = product(gFieldExt.geo.nodeSite) * DIM * SU3_NUM_OF_GENERATORS;
 //	vector<vector<double> > dev_list; dev_list.resize(alpha_size);
@@ -536,10 +546,13 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 		report << "avgPlaq =        \t" << avgPlaq << endl;
 
 //		derivative_list(dev_list, gField, arg);	
+		derivative_field(dField, gField, arg);
+
 		double dv_sum = derivative_sum(gField, arg);
+		report << "FINE DERIVATIVE SUM =\t" << dv_sum << endl;
 
 		if(getIdNode() == 0){
-			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%.12e\t%i\n", i + 1, 
+			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%+.12e\t%i\n", i + 1, 
 				abs(deltaH), acceptProbability, avgPlaq, dv_sum, doesAccept);
 			fflush(pFile);
 		}
@@ -572,6 +585,10 @@ inline void runHMC(Field<Matrix> &gFieldExt, const argCHmcWilson &arg, FILE *pFi
 				(double)numAccept / (numAccept + numReject));
 		fflush(pFile);
 	}
+
+	Field<vector<double> > dField_output; dField_output.init(geo_coarse);
+	sophisticated_make_to_order(dField_output, dField_output);
+	sophisticated_serial_write(dField_output, arg.exportAddress + "dev_dump");
 
 	Timer::display();
 }
