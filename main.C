@@ -6,22 +6,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <qmp.h>
-#include <config.h>
-#include <util/lattice.h>
-#include <util/gjp.h>
-#include <util/verbose.h>
-#include <util/error.h>
-#include <util/random.h>
-#include <alg/alg_pbp.h>
-#include <alg/do_arg.h>
-#include <alg/common_arg.h>
-#include <alg/pbp_arg.h>
-
-#include <alg/alg_meas.h>
-#include <util/ReadLatticePar.h>
-#include <util/qioarg.h>
-
 #include <qlat/config.h>
 #include <qlat/utils.h>
 #include <qlat/mpi.h>
@@ -31,7 +15,6 @@
 #include <qlat/field-rng.h>
 
 #include "field-hmc.h"
-#include "cps_util.h"
 
 // #include<qmp.h>
 // #include<mpi.h>
@@ -47,24 +30,24 @@ void naive_field_expansion(const cps::Lattice &lat,
 				int mag)
 {
 	// from CPS to qlat
-	syncNode();
+	sync_node();
 #pragma omp parallel for
 	for(long local_index = 0; local_index < GJP.VolNodeSites(); local_index++){
 		int x_cps[4]; GJP.LocalIndex(local_index, x_cps);
 		Coordinate x_qlat(mag * x_cps[0], mag * x_cps[1],
 					mag * x_cps[2], mag * x_cps[3]);
-                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.getElems(x_qlat));
+                qlat::Vector<cps::Matrix> vec_qlat(gauge_field_qlat.get_elems(x_qlat));
                 vec_qlat[0] = *lat.GetLink(x_cps, 0);
                 vec_qlat[1] = *lat.GetLink(x_cps, 1);
                 vec_qlat[2] = *lat.GetLink(x_cps, 2);
                 vec_qlat[3] = *lat.GetLink(x_cps, 3);	
 	}	
-	syncNode();
+	sync_node();
 	if(UniqueID() == 0) std::cout << "Field expansion finished." << std::endl;
 }
 
 void hmc_in_qlat(const Coordinate &totalSize, 
-                        string config_addr, const argCHmcWilson &argHMC,
+                        string config_addr, const Arg_chmc &arg,
 			int argc, char *argv[]){
 // 	Start(&argc, &argv);
 // 	int totalSite[] = {totalSize[0], totalSize[1], totalSize[2], totalSize[3]};
@@ -81,10 +64,10 @@ void hmc_in_qlat(const Coordinate &totalSize,
 // 	// Set up LQPS
 // 
 // 	begin(QMP_COMM_WORLD, Coordinate(SizeX(), SizeY(), SizeZ(), SizeT()));
-// 	Coordinate totalSite_qlat(argHMC.mag * GJP.NodeSites(0) * SizeX(), 
-// 				argHMC.mag * GJP.NodeSites(1) * SizeY(), 
-// 				argHMC.mag * GJP.NodeSites(2) * SizeZ(), 
-// 				argHMC.mag * GJP.NodeSites(3) * SizeT());
+// 	Coordinate totalSite_qlat(arg.mag * GJP.NodeSites(0) * SizeX(), 
+// 				arg.mag * GJP.NodeSites(1) * SizeY(), 
+// 				arg.mag * GJP.NodeSites(2) * SizeZ(), 
+// 				arg.mag * GJP.NodeSites(3) * SizeT());
 	begin(&argc, &argv);
 
 	Geometry geoOrigin; geoOrigin.init(totalSize, DIM);
@@ -100,64 +83,64 @@ void hmc_in_qlat(const Coordinate &totalSize,
 	report << "AVERAGE Plaquette Original = \t" << avg_plaquette(gFieldOrigin) << endl;
 
 	Geometry geoExpanded;
-	geoExpanded.init(argHMC.mag * totalSize, DIM);
+	geoExpanded.init(arg.mag * totalSize, DIM);
 	geoExpanded.resize(expansion, expansion);
 
 	Field<Matrix> gFieldExpanded;
 	gFieldExpanded.init(geoExpanded);
 
 #pragma omp parallel for
-	for(long index = 0; index < geoExpanded.localVolume(); index++){
-		Coordinate x; geoExpanded.coordinateFromIndex(x, index);
+	for(long index = 0; index < geoExpanded.local_volume(); index++){
+		Coordinate x; geoExpanded.coordinate_from_index(x, index);
 		for(int mu = 0; mu < geoExpanded.multiplicity; mu++){
-			gFieldExpanded.getElems(x)[mu].UnitMatrix();
+			gFieldExpanded.get_elems(x)[mu].UnitMatrix();
 	}}
-	syncNode();
+	sync_node();
 #pragma omp parallel for
-	for(long index = 0; index < geoOrigin.localVolume(); index++){
-		Coordinate x; geoOrigin.coordinateFromIndex(x, index);
-		Coordinate xExpanded = argHMC.mag * x;
+	for(long index = 0; index < geoOrigin.local_volume(); index++){
+		Coordinate x; geoOrigin.coordinate_from_index(x, index);
+		Coordinate xExpanded = arg.mag * x;
 		for(int mu = 0; mu < DIM; mu++){
-			gFieldExpanded.getElems(xExpanded)[mu] = 
-						gFieldOrigin.getElemsConst(x)[mu]; 
+			gFieldExpanded.get_elems(xExpanded)[mu] = 
+						gFieldOrigin.get_elems_const(x)[mu]; 
 	}}	
-	syncNode();
+	sync_node();
 	report << "Field Expansion Finished." << std::endl;
 	
 	Chart<Matrix> chart;
-	produce_chart_envelope(chart, gFieldExpanded.geo, argHMC.gA);
+	produce_chart_envelope(chart, gFieldExpanded.geo, arg.gauge);
 	
 	fetch_expanded(gFieldExpanded);
 	report << "AVERAGE Plaquette =     \t" << avg_plaquette(gFieldExpanded) << endl;
 	report << "CONSTRAINED Plaquette = \t" 
-		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
+		<< check_constrained_plaquette(gFieldExpanded, arg.mag) << endl;	
 
 //  start hmc 
 	FILE *pFile = fopen("/bgusr/home/jtu/mag/data/alg_gchmc_test.dat", "a");
 
-	if(getIdNode() == 0){
+	if(get_id_node() == 0){
 		time_t now = time(NULL);
 		fputs("# ", pFile);
 		fputs(ctime(&now), pFile);
 		fputs(show(gFieldExpanded.geo).c_str(), pFile); fputs("\n", pFile);
 		fprintf(pFile, "# Coarse Config: %s\n", config_addr.c_str());
-		fprintf(pFile, "# mag =        %i\n", argHMC.mag);
-		fprintf(pFile, "# trajLength = %i\n", argHMC.trajLength);
-		fprintf(pFile, "# numTraj =    %i\n", argHMC.numTraj);
-		fprintf(pFile, "# beta =       %.3f\n", argHMC.beta);
-		fprintf(pFile, "# dt =         %.5f\n", argHMC.dt);
+		fprintf(pFile, "# mag =        %i\n", arg.mag);
+		fprintf(pFile, "# trajLength = %i\n", arg.trajectory_length);
+		fprintf(pFile, "# numTraj =    %i\n", arg.num_trajectory);
+		fprintf(pFile, "# beta =       %.3f\n", arg.beta);
+		fprintf(pFile, "# dt =         %.5f\n", arg.dt);
 		fprintf(pFile, 
 			"# traj. number\texp(-DeltaH)\tavgPlaq\taccept/reject\n");
 		fflush(pFile);
 		report << "pFile opened." << endl;
 	}
 
-	runHMC(gFieldExpanded, argHMC, pFile);
+	run_chmc(gFieldExpanded, arg, pFile);
 	
 	fetch_expanded(gFieldExpanded);
 	report << "AVERAGE Plaquette =     \t" << avg_plaquette(gFieldExpanded) << endl;
 	report << "CONSTRAINED Plaquette = \t" 
-		<< check_constrained_plaquette(gFieldExpanded, argHMC.mag) << endl;	
+		<< check_constrained_plaquette(gFieldExpanded, arg.mag) << endl;	
 	
 	Timer::display();
 
@@ -182,7 +165,7 @@ int main(int argc, char* argv[]){
 	cout.setf(ios::scientific);
 
 	Coordinate total_size(24, 24, 24, 64);
-	int mag_factor = 2;
+	int mag = 2;
 	
 	int origin_start = 		380;
 	int origin_end = 		680;
@@ -191,20 +174,20 @@ int main(int argc, char* argv[]){
 	string cps_config;
 	string expanded_config;
 
-	argCHmcWilson argHMC;
+	Arg_chmc arg;
 
 	for(int i = origin_start; i <= origin_end; i += origin_interval){
-		argHMC.mag = mag_factor;
-		argHMC.trajLength = 11;
-		argHMC.numTraj = 1600;
-		argHMC.beta = 5.40;
-		argHMC.dt = 1. / argHMC.trajLength;
-		argHMC.outputInterval = 10;
-		argHMC.forceAccept = 20;
-		argHMC.outputStart = 60;
+		arg.mag = mag;
+		arg.trajectory_length = 11;
+		arg.num_trajectory = 1600;
+		arg.beta = 5.40;
+		arg.dt = 1. / arg.trajectory_length;
+		arg.num_step_between_output = 10;
+		arg.num_forced_accept_step = 20;
+		arg.num_step_before_output = 60;
 
-		gAction gA_; gA_.type = qlat::WILSON;
-		argHMC.gA = gA_;
+		Gauge gauge; gauge.type = qlat::WILSON;
+		arg.gauge = gauge;
 
 		cps_config = "/bgusr/data09/qcddata/DWF/2+1f/24nt64/IWASAKI+DSDR/"
 		"b1.633/ls24/M1.8/ms0.0850/ml0.00107/evol1/configurations/"
@@ -213,19 +196,19 @@ int main(int argc, char* argv[]){
 // 		expanded_config = "/bgusr/home/jtu/config/"
 // 		"2+1f_24nt64_IWASAKI+DSDR_b1.633_ls24_M1.8_ms0.0850_ml0.00107/"
 // 		"ckpoint_lat." + show((long)i) + "_mag" + show((long)mag_factor) + 
-// 		"_b" + str_printf("%.2f", argHMC.beta) + "_WILSON/";
+// 		"_b" + str_printf("%.2f", arg.beta) + "_WILSON/";
 
 		expanded_config = "";
 
 		mkdir(expanded_config.c_str(), 0777);	
 
-		argHMC.exportAddress = expanded_config;
+		arg.export_dir_stem = expanded_config;
 			
-		hmc_in_qlat(total_size, cps_config, argHMC, argc, argv);
+		hmc_in_qlat(total_size, cps_config, arg, argc, argv);
 	}
 
-	syncNode();
-	cout << "[" << getIdNode() << "]: ""Program Ended Normally." << endl;
+	sync_node();
+	cout << "[" << get_id_node() << "]: ""Program Ended Normally." << endl;
 
 	return 0;
 }

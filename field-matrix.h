@@ -31,10 +31,10 @@ inline double norm(const Matrix &m){
 inline double reunitarize(Field<Matrix> &field){
 	double maxDev = 0.;
 	Matrix oldElem;
-        for(long index = 0; index < field.geo.localVolume(); index++){
-                Coordinate x; field.geo.coordinateFromIndex(x, index);
+        for(long index = 0; index < field.geo.local_volume(); index++){
+                Coordinate x; field.geo.coordinate_from_index(x, index);
                 for(int mu = 0; mu < field.geo.multiplicity; mu++){
-			Matrix &newElem = field.getElems(x)[mu];
+			Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
 			newElem.Unitarize();
 			maxDev = max(maxDev, norm(newElem - oldElem));
@@ -42,7 +42,7 @@ inline double reunitarize(Field<Matrix> &field){
 	return maxDev;
 }
 
-inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field, 
+inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir){
 	Matrix mul; mul.UnitMatrix();
 	Matrix dag;
@@ -52,11 +52,11 @@ inline void getPathOrderedProd(Matrix &prod, const Field<Matrix> &field,
 		direction = dir[i];
 		assert(direction < DIM * 2 && direction > -1);
 		if(direction < DIM){
-			mul = mul * field.getElemsConst(y)[direction];
+			mul = mul * field.get_elems_const(y)[direction];
 			y[direction]++;
 		}else{
 			y[direction - DIM]--;
-			dag.Dagger(field.getElemsConst(y)[direction - DIM]);
+			dag.Dagger(field.get_elems_const(y)[direction - DIM]);
 			mul = mul * dag;
 		}
 	}
@@ -74,33 +74,33 @@ inline double avg_plaquette(const qlat::Field<Matrix> &gauge_field_qlat){
 
 	double node_sum = 0.;
 	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+	for(long index = 0; index < geo_.local_volume(); index++){
+		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
 		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
+			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[mu];
 			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
+			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[nu];
 			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
 			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
+			dag1.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[mu]);
 			mul = mul * dag1;
 			x_qlat = x_qlat - dir_vec[nu];
 			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
+			dag2.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[nu]);
 			mul = mul * dag2;
 
 			node_sum += mul.ReTr();
 		 }}
 	}
 	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
-	return global_sum / (18. * getNumNode() * geo_.localVolume());
+	return global_sum / (18. * get_num_node() * geo_.local_volume());
 }
 
-inline double totalPlaq(const qlat::Field<Matrix> &gauge_field_qlat){
+inline double total_plaq(const qlat::Field<Matrix> &gauge_field_qlat){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
@@ -111,28 +111,28 @@ inline double totalPlaq(const qlat::Field<Matrix> &gauge_field_qlat){
 
 	double node_sum = 0.;
 	
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+	for(long index = 0; index < geo_.local_volume(); index++){
+		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
 		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[mu];
+			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[mu];
 			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.getElemsConst(x_qlat)[nu];
+			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[nu];
 			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
 			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[mu]);
+			dag1.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[mu]);
 			mul = mul * dag1;
 			x_qlat = x_qlat - dir_vec[nu];
 			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.getElemsConst(x_qlat)[nu]);
+			dag2.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[nu]);
 			mul = mul * dag2;
 
 			node_sum += mul.ReTr();
 		 }}
 	}
 	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
 	return global_sum;
 }
@@ -140,35 +140,34 @@ inline double totalPlaq(const qlat::Field<Matrix> &gauge_field_qlat){
 inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	qlat::Geometry geo_ = gauge_field_qlat.geo;
 	double tr_node_sum = 0.;
-	for(long index = 0; index < geo_.localVolume(); index++){
-		 Coordinate x_qlat; geo_.coordinateFromIndex(x_qlat, index);
+	for(long index = 0; index < geo_.local_volume(); index++){
+		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 	tr_node_sum += \
-				(gauge_field_qlat.getElemsConst(x_qlat)[mu]).ReTr();
+				(gauge_field_qlat.get_elems_const(x_qlat)[mu]).ReTr();
 		 }
 	}
 	double tr_global_sum = 0.;
-	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+	MPI_Allreduce(&tr_node_sum, &tr_global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
-	return tr_global_sum / (12. * getNumNode() * geo_.localVolume());
+	return tr_global_sum / (12. * get_num_node() * geo_.local_volume());
 }
 
-inline double check_constrained_plaquette(const qlat::Field<Matrix> &gauge_field_qlat,
-						int mag){
+inline double check_constrained_plaquette(const qlat::Field<Matrix> &gField, int mag){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
 	dir_vec[2] = Coordinate(0, 0, 1, 0);
 	dir_vec[3] = Coordinate(0, 0, 0, 1);
 
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
+	qlat::Geometry geo_ = gField.geo;
 	
 	long count = 0;
 	double node_sum = 0.;
-	for(int x0 = 0; x0 < geo_.nodeSite[0]; x0 += mag){
-	for(int x1 = 0; x1 < geo_.nodeSite[1]; x1 += mag){
-	for(int x2 = 0; x2 < geo_.nodeSite[2]; x2 += mag){
-	for(int x3 = 0; x3 < geo_.nodeSite[3]; x3 += mag){
+	for(int x0 = 0; x0 < geo_.node_site[0]; x0 += mag){
+	for(int x1 = 0; x1 < geo_.node_site[1]; x1 += mag){
+	for(int x2 = 0; x2 < geo_.node_site[2]; x2 += mag){
+	for(int x3 = 0; x3 < geo_.node_site[3]; x3 += mag){
 		Coordinate x(x0, x1, x2, x3);
 		for(int mu = 0; mu < DIM; mu++){
 		for(int nu = 0; nu < mu; nu++){
@@ -179,7 +178,7 @@ inline double check_constrained_plaquette(const qlat::Field<Matrix> &gauge_field
 			for(int i = 0; i < mag; i++) dir.push_back(mu + DIM);
 			for(int i = 0; i < mag; i++) dir.push_back(nu + DIM);
 			
-			getPathOrderedProd(m, gauge_field_qlat, x, dir);
+			get_path_ordered_product(m, gField, x, dir);
 			
 			count++;
 			node_sum += m.ReTr();
@@ -187,26 +186,25 @@ inline double check_constrained_plaquette(const qlat::Field<Matrix> &gauge_field
 	}}}}
 
 	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
+	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
-	return global_sum / (3. * count * getNumNode());
+	return global_sum / (3. * count * get_num_node());
 }
 
-class argExport{
+class Arg_export{
 public:
 	double beta;
-	int sequenceNum;
-	string ensembleLabel;
+	int sequence_num;
+	string ensemble_label;
 };
 
-inline void export_config_nersc(const Field<Matrix> &field, const string exportAddr,
-					const argExport &arg,
-					const bool doesSkipThird = false){
+inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
+					const Arg_export &arg, const bool doesSkipThird = false){
 	FILE *pExport;
 
 	Geometry geo_expand_one;
 	geo_expand_one.init(field.geo.geon, field.geo.multiplicity,  
-		field.geo.nodeSite, Coordinate(1, 1, 1, 1), Coordinate(1, 1, 1, 1));
+		field.geo.node_site, Coordinate(1, 1, 1, 1), Coordinate(1, 1, 1, 1));
 
 	Field<Matrix> field_cp; field_cp.init(geo_expand_one);
 	field_cp = field;
@@ -225,9 +223,9 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 	checksumSum.setf(std::ios::hex, std::ios::basefield);
 	checksumSum << fieldChecksumSum32(field_write);
 
-	if(getIdNode() == 0){
+	if(get_id_node() == 0){
 		cout << "Node 0 open file!" << endl;
-		pExport = fopen(exportAddr.c_str(), "w");
+		pExport = fopen(dir.c_str(), "w");
 		assert(pExport != NULL);
 
 		std::ostringstream header_stream;
@@ -236,10 +234,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 		header_stream << "HDR_VERSION = 1.0" << endl;
 		if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
 		else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
-		header_stream << "DIMENSION_1 = " << field.geo.totalSite(0) << endl;
-		header_stream << "DIMENSION_2 = " << field.geo.totalSite(1) << endl;
-		header_stream << "DIMENSION_3 = " << field.geo.totalSite(2) << endl;
-		header_stream << "DIMENSION_4 = " << field.geo.totalSite(3) << endl;
+		header_stream << "DIMENSION_1 = " << field.geo.total_site(0) << endl;
+		header_stream << "DIMENSION_2 = " << field.geo.total_site(1) << endl;
+		header_stream << "DIMENSION_3 = " << field.geo.total_site(2) << endl;
+		header_stream << "DIMENSION_4 = " << field.geo.total_site(3) << endl;
 		header_stream << "CRC32HASH = " << crc32Hash << endl;
 		header_stream << "CHECKSUM = " << checksumSum.str() << endl;
 		
@@ -249,10 +247,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 		header_stream << "CREATOR = RBC" << endl;
 		time_t now = std::time(NULL);	
 		header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
-		header_stream << "ENSEMBLE_LABEL = " << arg.ensembleLabel << endl;
+		header_stream << "ENSEMBLE_LABEL = " << arg.ensemble_label << endl;
 		header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
 		header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
-		header_stream << "SEQUENCE_NUMBER = " << arg.sequenceNum << endl;
+		header_stream << "SEQUENCE_NUMBER = " << arg.sequence_num << endl;
 		header_stream << "BETA = " << arg.beta << endl; 
 		header_stream << "END_HEADER" << endl;
 
@@ -260,7 +258,7 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 		fclose(pExport);
 	}
 
-	sophisticated_serial_write(field_write, exportAddr, true);
+	sophisticated_serial_write(field_write, dir, true);
 
 	}else{
 		Field<Matrix> field_write;
@@ -271,9 +269,9 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 		checksumSum.setf(std::ios::hex, std::ios::basefield);
 		checksumSum << fieldChecksumSum32(field_write);
 
-		if(getIdNode() == 0){
+		if(get_id_node() == 0){
 			cout << "Node 0 open file!" << endl;
-			pExport = fopen(exportAddr.c_str(), "w");
+			pExport = fopen(dir.c_str(), "w");
 			assert(pExport != NULL);
 
 			std::ostringstream header_stream;
@@ -282,10 +280,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 			header_stream << "HDR_VERSION = 1.0" << endl;
 			if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
 			else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
-			header_stream << "DIMENSION_1 = " << field.geo.totalSite(0) << endl;
-			header_stream << "DIMENSION_2 = " << field.geo.totalSite(1) << endl;
-			header_stream << "DIMENSION_3 = " << field.geo.totalSite(2) << endl;
-			header_stream << "DIMENSION_4 = " << field.geo.totalSite(3) << endl;
+			header_stream << "DIMENSION_1 = " << field.geo.total_site(0) << endl;
+			header_stream << "DIMENSION_2 = " << field.geo.total_site(1) << endl;
+			header_stream << "DIMENSION_3 = " << field.geo.total_site(2) << endl;
+			header_stream << "DIMENSION_4 = " << field.geo.total_site(3) << endl;
 			header_stream << "CRC32HASH = " << crc32Hash << endl;
 			header_stream << "CHECKSUM = " << checksumSum.str() << endl;
 			header_stream << "LINK_TRACE = " << avgReTr << endl;
@@ -293,10 +291,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 			header_stream << "CREATOR = RBC" << endl;
 			time_t now = std::time(NULL);	
 			header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
-			header_stream << "ENSEMBLE_LABEL = " << arg.ensembleLabel << endl;
+			header_stream << "ENSEMBLE_LABEL = " << arg.ensemble_label << endl;
 			header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
 			header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
-			header_stream << "SEQUENCE_NUMBER = " << arg.sequenceNum << endl;
+			header_stream << "SEQUENCE_NUMBER = " << arg.sequence_num << endl;
 			header_stream << "BETA = " << arg.beta << endl; 
 			header_stream << "END_HEADER" << endl;
 
@@ -304,7 +302,7 @@ inline void export_config_nersc(const Field<Matrix> &field, const string exportA
 			fclose(pExport);
 		}
 
-		sophisticated_serial_write(field_write, exportAddr, true);
+		sophisticated_serial_write(field_write, dir, true);
 		
 
 	}
@@ -324,11 +322,11 @@ inline void import_config_nersc(Field<Matrix> &field, const string importAddr,
 		sophisticated_serial_read(gf_qlat_trunc, importAddr, 
 						num_of_reading_threads);
 
-		for(long index = 0; index < geo_.localVolume(); index++){
-			Coordinate x; geo_.coordinateFromIndex(x, index);
+		for(long index = 0; index < geo_.local_volume(); index++){
+			Coordinate x; geo_.coordinate_from_index(x, index);
 			for(int mu = 0; mu < DIM; mu++){
-				memcpy((void *)(field.getElems(x).data() + mu), 
-				(void *)(gf_qlat_trunc.getElemsConst(x).data() + mu), 
+				memcpy((void *)(field.get_elems(x).data() + mu), 
+				(void *)(gf_qlat_trunc.get_elems_const(x).data() + mu), 
 				sizeof(MatrixTruncatedSU3));
 			}
 		}
