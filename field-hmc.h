@@ -405,6 +405,18 @@ inline double derivative(const Field<Matrix> &gField,
 	return temp.ReTr();
 }
 
+inline double derivative_pair(const Field<Matrix> &gField,
+								const Coordinate &x, int mu, int b){
+	Coordinate y = x; y[mu]++;
+	Matrix &U1 = gField.get_elems_const(x)[mu];								
+	Matrix &U2 = gField.get_elems_const(y)[mu];
+	Matrix V1_dagger; get_staple_dagger(V1_dagger, gField, x, mu);
+	Matrix V2_dagger; get_staple_dagger(V2_dagger, gField, y, mu);
+	Matrix temp1 = su3_generators[b] * V1_dagger * U1 * qlat::Complex(0., -1.);
+	Matrix temp2 = su3_generators[b] * U2 * V2_dagger * qlat::Complex(0., 1.);
+	return (temp1 + temp2).ReTr();
+}
+
 inline void derivative_field(Field<double> &dField, Field<Matrix> &gField, 
 								const Arg_chmc &arg){
 	for(int i = 0; i < DIM; i++){
@@ -419,7 +431,8 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
 			dField.get_elems(x)[spin_color_index] = 
-										derivative(gField, arg.mag * x, mu, a);
+									derivative(gField, arg.mag * x, mu, a)
+									+ derivative_pair(gField, arg.mag * x, mu, (a+3)%8);
 		}}
 	}
 }
