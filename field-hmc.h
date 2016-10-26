@@ -418,7 +418,7 @@ inline double derivative_pair(const Field<Matrix> &gField,
 }
 
 inline void derivative_field(Field<double> &dField, Field<Matrix> &gField, 
-								const Arg_chmc &arg){
+								const Arg_chmc &arg, bool does_pair = false){
 	for(int i = 0; i < DIM; i++){
 		assert(gField.geo.node_site[i] % dField.geo.node_site[i] == 0); 
 	}
@@ -430,9 +430,13 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 		for(int mu = 0; mu < DIM; mu++){
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
-			dField.get_elems(x)[spin_color_index] = 
+			if(does_pair)
+				dField.get_elems(x)[spin_color_index] = 
 									derivative(gField, arg.mag * x, mu, a)
 									+ derivative_pair(gField, arg.mag * x, mu, (a+3)%8);
+			else
+				dField.get_elems(x)[spin_color_index] = 
+									derivative(gField, arg.mag * x, mu, a);
 		}}
 	}
 }
@@ -562,7 +566,7 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 			if(get_id_node() == 0) printf("ACCEPT RATE = %.3f\n",
 										(double)numAccept / (numAccept + numReject));		
 			if(arg.summary_dir_stem.size() > 0){
-				derivative_field(dField, gField, arg);
+				derivative_field(dField, gField, arg, true);
 				Field<double> dField_output; dField_output.init(geo_coarse);
 				sophisticated_make_to_order(dField_output, dField);
 				sophisticated_serial_write(dField_output, 
