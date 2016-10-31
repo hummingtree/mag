@@ -14,6 +14,8 @@
 #include <qlat/field-rng.h>
 #include <qlat/field-io.h>
 
+#include <timer.h>
+
 using namespace cps;
 using namespace qlat;
 using namespace std;

@@ -27,7 +27,7 @@ BIN = BGQ.x
 #
 # include list for the Columbia code
 #
-INCLIST = -I${BUILDDIR} -I${SRCDIR}/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/include  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include    -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/eigen3 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/Qlattice/ -I/bgusr/home/jtu/qlat-build/1.0/include -I/bgusr/home/jtu/RngState-cc
+INCLIST = -I${BUILDDIR} -I${SRCDIR}/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/bfm/include  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include    -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2  -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/eigen3 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include/libxml2 -I/bgusr/home/jtu/cps-jtu-build/1.0/local/include -I/bgusr/home/jtu/Qlattice/ -I/bgusr/home/jtu/qlat-build/1.0/include -I/bgusr/home/jtu/RngState-cc -I/bgusr/home/jtu/Timer
 
 CFLAGS= -g -O2 -fopenmp -O2 -Wall -std=c++0x -fno-strict-aliasing
 CXXFLAGS=  -fopenmp -O2 -Wall -std=c++0x -fno-strict-aliasing

@@ -12,6 +12,8 @@
 #include <qlat/field-comm.h>
 #include <qlat/field-rng.h>
 
+#include <timer.h>
+
 #include "field-matrix.h"
 
 using namespace cps;
@@ -117,7 +119,7 @@ inline void rn_filling_SHA256_gaussian(std::vector<double> &xs)
 		Coordinate xl; geo.coordinate_from_index(xl, index);
 		RngState& rs = rf.get_elem(xl);
 		for (int i = chunk * index; i < chunk * (index + 1); ++i){
-			xs[i] = gRandGen(rs);
+			xs[i] = g_rand_gen(rs);
 		}
 	}
 }
@@ -391,7 +393,7 @@ inline void init_momentum(Field<Matrix> &mField){
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
-				mTemp += su3_generators[a] * gRandGen(rng_field.get_elem(x));
+				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x));
 			}
 			mField.get_elems(x)[mu] = mTemp;
 	}}
@@ -465,7 +467,7 @@ inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
 
 inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile){
 	TIMER("algCHmcWilson::runHMC()");
-	assert(pFile != NULL);
+	if(!get_id_node()) assert(pFile != NULL);
 	assert(arg.num_trajectory > 20);
 
 	RngState globalRngState("By the witness of the martyrs.");
@@ -506,7 +508,7 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 		
 		newH = get_hamiltonian(gField, mField, arg);
 	
-		dieRoll = uRandGen(globalRngState);
+		dieRoll = u_rand_gen(globalRngState);
 		deltaH = newH - oldH;
 		percentDeltaH = deltaH / oldH;
 		acceptProbability = exp(oldH - newH);
@@ -533,28 +535,28 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 			}	
 		}
 		
-		report << "old Hamiltonian =\t" << oldH << endl;
-		report << "new Hamiltonian =\t" << newH << endl;
-		report << "exp(-Delta H) =  \t" << acceptProbability << endl;
-		report << "Die Roll =       \t" << dieRoll << endl; 
-		report << "Delta H =        \t" << deltaH << endl; 
-		report << "Delta H Ratio =  \t" << percentDeltaH << endl; 
-		
+		qlat::Printf("Old Hamiltonian =\t%+.12e\n", oldH);
+		qlat::Printf("New Hamiltonian =\t%+.12e\n", newH);
+		qlat::Printf("Delta H         =\t%+.12e\n", deltaH); 
+		qlat::Printf("Delta H Ratio   =\t%+.12e\n", percentDeltaH); 
+		qlat::Printf("exp(-Delta H)   =\t%12.6f\n", acceptProbability);
+		qlat::Printf("Die Roll        =\t%12.6f\n", dieRoll); 	
+	
 		fetch_expanded_chart(gField, chart);
 		avgPlaq = avg_plaquette(gField);
-		report << "avgPlaq =        \t" << avgPlaq << endl;
-
+		qlat::Printf("Avg Plaquette   =\t%+.12e\n", avgPlaq); 
+		qlat::Printf("ACCEPT RATE     =\t%+.4f\n", 
+						(double)numAccept / (numAccept + numReject));	
 //		derivative_list(dev_list, gField, arg);	
-		double dv_sum = derivative_sum(gField, arg);
-		report << "FINE DERIVATIVE SUM =\t" << dv_sum << endl;
+//		double dv_sum = derivative_sum(gField, arg);
+//		report << "FINE DERIVATIVE SUM =\t" << dv_sum << endl;
 
-		if(get_id_node() == 0){
-			fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%+.12e\t%i\n", i + 1, 
-				abs(deltaH), acceptProbability, avgPlaq, dv_sum, doesAccept);
-			fflush(pFile);
-		}
+		Fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\n", i + 1, 
+			abs(deltaH), acceptProbability, avgPlaq, doesAccept);
+		Fflush(pFile);
 
-		if((i + 1) % arg.num_step_between_output == 0 && i + 1 >= arg.num_step_before_output){
+		if((i + 1) % arg.num_step_between_output == 0 
+											&& i + 1 >= arg.num_step_before_output){
 			Arg_export arg_export;
 			arg_export.beta = arg.beta;
 			arg_export.sequence_num = i + 1;
@@ -563,8 +565,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 				string address = arg.export_dir_stem + "ckpoint." + show(i + 1);
 				export_config_nersc(gFieldExt, address, arg_export, true);
 			}
-			if(get_id_node() == 0) printf("ACCEPT RATE = %.3f\n",
-										(double)numAccept / (numAccept + numReject));		
+			
+			sync_node();
+	
 			if(arg.summary_dir_stem.size() > 0){
 				derivative_field(dField, gField, arg, true);
 				Field<double> dField_output; dField_output.init(geo_coarse);
@@ -584,11 +587,8 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 //									int(ceil(ATC)), dev_val[j]);
 //	}
 
-	if(get_id_node() == 0){
-		fprintf(pFile, "Accept Rate = %.3f\n", 
-				(double)numAccept / (numAccept + numReject));
-		fflush(pFile);
-	}
+	Fprintf(pFile, "Accept Rate = %.4f\n", (double)numAccept / (numAccept + numReject));
+	Fflush(pFile);
 
 	Timer::display();
 }
