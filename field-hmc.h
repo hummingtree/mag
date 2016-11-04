@@ -116,7 +116,7 @@ inline void rn_filling_SHA256_gaussian(std::vector<double> &xs)
 	const int chunk = xs.size() / geo.local_volume();
 #pragma omp parallel for
 	for (long index = 0; index < geo.local_volume(); index++){
-		Coordinate xl; geo.coordinate_from_index(xl, index);
+		Coordinate xl = geo.coordinate_from_index(index);
 		RngState& rs = rf.get_elem(xl);
 		for (int i = chunk * index; i < chunk * (index + 1); ++i){
 			xs[i] = g_rand_gen(rs);
@@ -177,7 +177,7 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 	for(long index = 0; index < fField.geo.local_volume(); index++){
 		Coordinate x; 
 		Matrix mStaple1, mStaple2, mTemp;
-		fField.geo.coordinate_from_index(x, index);
+		x = fField.geo.coordinate_from_index(index);
 		for(int mu = 0; mu < fField.geo.multiplicity; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
 			case 0: {
@@ -220,8 +220,7 @@ inline void evolve_momentum(Field<Matrix> &mField,
 	assert(is_matching_geo(mField.geo, fField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x; 
-		mField.geo.coordinate_from_index(x, index);
+		Coordinate x = mField.geo.coordinate_from_index(index);
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mField.get_elems(x)[mu] += fField.get_elems_const(x)[mu] * dt;
 	}}
@@ -234,8 +233,7 @@ inline void evolve_gauge_field(Field<Matrix> &gField,
 	assert(is_matching_geo(mField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < gField.geo.local_volume(); index++){
-		Coordinate x; 
-		gField.geo.coordinate_from_index(x, index);
+		Coordinate x = gField.geo.coordinate_from_index(index);
 		Matrix mL, mR;
 		for(int mu = 0; mu < gField.geo.multiplicity; mu++){
 		// only works for Matrix
@@ -345,7 +343,7 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 #pragma omp for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		for(int mu = 0; mu < DIM; mu++){
-			Coordinate x; mField.geo.coordinate_from_index(x, index);
+			Coordinate x = mField.geo.coordinate_from_index(index);
 			switch(is_constrained(x, mu, arg.mag)){
 				case 100: break;
 				// case 100: // test case
@@ -388,7 +386,7 @@ inline void init_momentum(Field<Matrix> &mField){
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x; mField.geo.coordinate_from_index(x, index);
+		Coordinate x = mField.geo.coordinate_from_index(index);
 		Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
@@ -427,7 +425,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 	fetch_expanded(gField);
 #pragma omp parallel for
 	for(long index = 0; index < dField.geo.local_volume(); index++){
-		Coordinate x; dField.geo.coordinate_from_index(x, index);
+		Coordinate x = dField.geo.coordinate_from_index(index);
 		int spin_color_index;
 		for(int mu = 0; mu < DIM; mu++){
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
@@ -472,8 +470,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 
 	RngState globalRngState("By the witness of the martyrs.");
 
-	Geometry geoExpand1; geoExpand1.copyButExpand(gFieldExt.geo, 1);
-	Geometry geoLocal; geoLocal.copyOnlyLocal(gFieldExt.geo);
+	Coordinate expansion(1, 1, 1, 1);
+	Geometry geoExpand1 = gFieldExt.geo; geoExpand1.resize(expansion, expansion);
+	Geometry geoLocal = gFieldExt.geo;
 	Field<Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
 	Field<Matrix> mField; mField.init(geoLocal);
 

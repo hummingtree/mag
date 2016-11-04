@@ -34,7 +34,7 @@ inline double reunitarize(Field<Matrix> &field){
 	double maxDev = 0.;
 	Matrix oldElem;
         for(long index = 0; index < field.geo.local_volume(); index++){
-                Coordinate x; field.geo.coordinate_from_index(x, index);
+                Coordinate x = field.geo.coordinate_from_index(index);
                 for(int mu = 0; mu < field.geo.multiplicity; mu++){
 			Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
@@ -77,7 +77,7 @@ inline double avg_plaquette(const qlat::Field<Matrix> &gauge_field_qlat){
 	double node_sum = 0.;
 	
 	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
+		 Coordinate x_qlat = geo_.coordinate_from_index(index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
 		 	Matrix mul; mul.UnitMatrix();
@@ -114,7 +114,7 @@ inline double total_plaq(const qlat::Field<Matrix> &gauge_field_qlat){
 	double node_sum = 0.;
 	
 	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
+		 Coordinate x_qlat = geo_.coordinate_from_index(index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 for(int nu = 0; nu < mu; nu++){	
 		 	Matrix mul; mul.UnitMatrix();
@@ -143,7 +143,7 @@ inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	qlat::Geometry geo_ = gauge_field_qlat.geo;
 	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat; geo_.coordinate_from_index(x_qlat, index);
+		 Coordinate x_qlat = geo_.coordinate_from_index(index);
 		 for(int mu = 0; mu < DIM; mu++){
 		 	tr_node_sum += \
 				(gauge_field_qlat.get_elems_const(x_qlat)[mu]).ReTr();
@@ -205,8 +205,9 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 	FILE *pExport;
 
 	Geometry geo_expand_one;
-	geo_expand_one.init(field.geo.geon, field.geo.multiplicity,  
-		field.geo.node_site, Coordinate(1, 1, 1, 1), Coordinate(1, 1, 1, 1));
+	geo_expand_one.init(field.geo.geon, field.geo.multiplicity, field.geo.node_site);
+	Coordinate expansion(1, 1, 1, 1);
+	geo_expand_one.resize(expansion, expansion);
 
 	Field<Matrix> field_cp; field_cp.init(geo_expand_one);
 	field_cp = field;
@@ -316,8 +317,7 @@ inline void import_config_nersc(Field<Matrix> &field, const string importAddr,
 					const bool doesSkipThird = false){
 
 	if(doesSkipThird){
-		Geometry geo_;
-		geo_.init(field.geo);
+		Geometry geo_ = field.geo;
 		Field<MatrixTruncatedSU3> gf_qlat_trunc;
 		gf_qlat_trunc.init(geo_);
 
@@ -325,7 +325,7 @@ inline void import_config_nersc(Field<Matrix> &field, const string importAddr,
 						num_of_reading_threads);
 
 		for(long index = 0; index < geo_.local_volume(); index++){
-			Coordinate x; geo_.coordinate_from_index(x, index);
+			Coordinate x = geo_.coordinate_from_index(index);
 			for(int mu = 0; mu < DIM; mu++){
 				memcpy((void *)(field.get_elems(x).data() + mu), 
 				(void *)(gf_qlat_trunc.get_elems_const(x).data() + mu), 
