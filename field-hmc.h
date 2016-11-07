@@ -178,11 +178,13 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 		Coordinate x; 
 		Matrix mStaple1, mStaple2, mTemp;
 		x = fField.geo.coordinate_from_index(index);
+		const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
+			  qlat::Vector<Matrix> fx = fField.get_elems(x);
 		for(int mu = 0; mu < fField.geo.multiplicity; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
 			case 0: {
 				get_staple_dagger(mStaple1, gField, x, mu);
-				mTemp = gField.get_elems_const(x)[mu] * mStaple1;
+				mTemp = gx[mu] * mStaple1;
 				break;
 			}
 			case 1:
@@ -190,8 +192,7 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 				Coordinate y(x); y[mu]++;
 				get_staple_dagger(mStaple1, gField, x, mu);
 				get_staple_dagger(mStaple2, gField, y, mu);
-				mTemp = gField.get_elems_const(y)[mu] * mStaple2 \
-					- mStaple1 * gField.get_elems_const(x)[mu];
+				mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
 				break;
 			}
 			case 100: mTemp.ZeroMatrix(); break;
@@ -202,14 +203,13 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 		// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
 		// 		break;
 		// 	} 
-		// 	// test case end
+		 	// test case end
 	
 		 	default: assert(false);
 			}
 	
 			mTemp.TrLessAntiHermMatrix(); 
-			fField.get_elems(x)[mu] = \
-				mTemp * qlat::Complex(0., arg.beta / 3.);
+			fx[mu] = mTemp * qlat::Complex(0., arg.beta / 3.);
 	}}
 }
 
@@ -221,8 +221,10 @@ inline void evolve_momentum(Field<Matrix> &mField,
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
+		const qlat::Vector<Matrix> fx = fField.get_elems_const(x);
+			  qlat::Vector<Matrix> mx = mField.get_elems(x);
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
-			mField.get_elems(x)[mu] += fField.get_elems_const(x)[mu] * dt;
+			mx[mu] += fx[mu] * dt;
 	}}
 }
 
@@ -235,31 +237,32 @@ inline void evolve_gauge_field(Field<Matrix> &gField,
 	for(long index = 0; index < gField.geo.local_volume(); index++){
 		Coordinate x = gField.geo.coordinate_from_index(index);
 		Matrix mL, mR;
+		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
+			  qlat::Vector<Matrix> gx = gField.get_elems(x);
 		for(int mu = 0; mu < gField.geo.multiplicity; mu++){
 		// only works for Matrix
-			Matrix &U = gField.get_elems(x)[mu];
 			Coordinate y(x); y[mu]--;
 			switch(is_constrained(x, mu, arg.mag)){
 			case 0: {
-				algebra_to_group(mL, mField.get_elems_const(x)[mu] * dt);
-				U = mL * U;
+				algebra_to_group(mL, mx[mu] * dt);
+				gx[mu] = mL * gx[mu];
 				break;
 			}
 			// case 100: // test case
 			case 1: {
 				algebra_to_group(mL, mField.get_elems_const(y)[mu] * dt);
-				algebra_to_group(mR, mField.get_elems_const(x)[mu] * -dt);
-				U = mL * U * mR;
+				algebra_to_group(mR, mx[mu] * -dt);
+				gx[mu] = mL * gx[mu] * mR;
 				break;
 			}
 			case 10: {
-				algebra_to_group(mR, mField.get_elems_const(x)[mu] * -dt);
-				U = U * mR;
+				algebra_to_group(mR, mx[mu] * -dt);
+				gx[mu] = gx[mu] * mR;
 			break;
 			}
 			case 100: {
 				algebra_to_group(mL, mField.get_elems_const(y)[mu] * dt);
-				U = mL * U;
+				gx[mu] = mL * gx[mu];
 				break;
 			}
 			default: assert(false);
@@ -342,16 +345,16 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 #pragma omp barrier
 #pragma omp for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
+		Coordinate x = mField.geo.coordinate_from_index(index);
+		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
 		for(int mu = 0; mu < DIM; mu++){
-			Coordinate x = mField.geo.coordinate_from_index(index);
 			switch(is_constrained(x, mu, arg.mag)){
 				case 100: break;
 				// case 100: // test case
 				case 0:
 				case 1:
 				case 10:{
-					Matrix mTemp = mField.get_elems_const(x)[mu];
-					pLocalSum += (mTemp * mTemp).ReTr();
+					pLocalSum += (mx[mu] * mx[mu]).ReTr();
 					break;
 				}
 				default: assert(false);
@@ -387,13 +390,14 @@ inline void init_momentum(Field<Matrix> &mField){
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Vector<Matrix> mx = mField.get_elems(x);
 		Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x));
 			}
-			mField.get_elems(x)[mu] = mTemp;
+			mx[mu] = mTemp;
 	}}
 }
 
@@ -427,16 +431,15 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 	for(long index = 0; index < dField.geo.local_volume(); index++){
 		Coordinate x = dField.geo.coordinate_from_index(index);
 		int spin_color_index;
+		qlat::Vector<double> dx = dField.get_elems(x);
 		for(int mu = 0; mu < DIM; mu++){
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
 			if(does_pair)
-				dField.get_elems(x)[spin_color_index] = 
-									derivative(gField, arg.mag * x, mu, a)
+				dx[spin_color_index] = derivative(gField, arg.mag * x, mu, a)
 									+ derivative_pair(gField, arg.mag * x, mu, (a+3)%8);
 			else
-				dField.get_elems(x)[spin_color_index] = 
-									derivative(gField, arg.mag * x, mu, a);
+				dx[spin_color_index] = derivative(gField, arg.mag * x, mu, a);
 		}}
 	}
 }
@@ -481,7 +484,7 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 
 	Coordinate total_size_coarse;
 	for(int i = 0; i < DIM; i++){
-		total_size_coarse[i] = geoLocal.total_site(i) / arg.mag;
+		total_size_coarse[i] = geoLocal.total_site()[i] / arg.mag;
 	}
 	Geometry geo_coarse; 
 	geo_coarse.init(total_size_coarse, DIM * SU3_NUM_OF_GENERATORS);

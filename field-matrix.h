@@ -65,78 +65,62 @@ inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field,
 	prod = mul;
 }
 
-inline double avg_plaquette(const qlat::Field<Matrix> &gauge_field_qlat){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
-
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
+inline double get_plaq(const Field<Matrix> &f, const Coordinate &x){
+	// assuming properly communicated.
 	
-	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat = geo_.coordinate_from_index(index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 for(int nu = 0; nu < mu; nu++){	
-		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[mu];
-			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[nu];
-			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[mu]);
-			mul = mul * dag1;
-			x_qlat = x_qlat - dir_vec[nu];
-			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[nu]);
-			mul = mul * dag2;
-
-			node_sum += mul.ReTr();
-		 }}
+	const qlat::Vector<Matrix> gx = f.get_elems_const(x);
+	vector<qlat::Vector<Matrix> > gxex(DIM);
+	Coordinate y;
+	for(int mu = 0; mu < DIM; mu++){
+		y = x; y[mu]++;
+		gxex[mu] = f.get_elems_const(y);
 	}
-	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
-
-	return global_sum / (18. * get_num_node() * geo_.local_volume());
+	Matrix m, n;
+	double ret = 0.;
+	for(int mu = 0; mu < DIM; mu++){
+	for(int nu = 0; nu < mu; nu++){
+		m = gx[mu] * gxex[mu][nu];
+		n.Dagger(gx[nu] * gxex[nu][mu]);
+		ret += (m * n).ReTr();
+	}}
+	return ret;
 }
 
-inline double total_plaq(const qlat::Field<Matrix> &gauge_field_qlat){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
+inline double total_plaq(const qlat::Field<Matrix> &f){
+	// assuming properly communicated.
+	TIMER("total_plaq()");
+	double local_sum = 0.;
+	int num_threads;
+	vector<double> pp_local_sum;
 
-	qlat::Geometry geo_ = gauge_field_qlat.geo;
-
-	double node_sum = 0.;
-	
-	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat = geo_.coordinate_from_index(index);
-		 for(int mu = 0; mu < DIM; mu++){
-		 for(int nu = 0; nu < mu; nu++){	
-		 	Matrix mul; mul.UnitMatrix();
-			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[mu];
-			x_qlat = x_qlat + dir_vec[mu];
-			mul = mul * gauge_field_qlat.get_elems_const(x_qlat)[nu];
-			x_qlat = x_qlat + dir_vec[nu] - dir_vec[mu];
-			Matrix dag1; 
-			dag1.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[mu]);
-			mul = mul * dag1;
-			x_qlat = x_qlat - dir_vec[nu];
-			Matrix dag2;
-			dag2.Dagger(gauge_field_qlat.get_elems_const(x_qlat)[nu]);
-			mul = mul * dag2;
-
-			node_sum += mul.ReTr();
-		 }}
+#pragma omp parallel
+{
+	if(omp_get_thread_num() == 0){
+		num_threads = omp_get_num_threads();
+		pp_local_sum.resize(num_threads);
 	}
+	double p_local_sum = 0.;
+#pragma omp barrier
+#pragma omp for
+	for(long index = 0; index < f.geo.local_volume(); index++){
+		Coordinate x = f.geo.coordinate_from_index(index);
+			p_local_sum += get_plaq(f, x);
+	}
+		pp_local_sum[omp_get_thread_num()] = p_local_sum;
+}
+
+	for(int i = 0; i < num_threads; i++){
+		local_sum += pp_local_sum[i];
+	}
+
 	double global_sum;
-	MPI_Allreduce(&node_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
+	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
 	return global_sum;
+}
+
+inline double avg_plaquette(const qlat::Field<Matrix> &f){
+	return total_plaq(f) / (18. * get_num_node() * f.geo.local_volume());
 }
 
 inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
@@ -237,10 +221,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 		header_stream << "HDR_VERSION = 1.0" << endl;
 		if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
 		else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
-		header_stream << "DIMENSION_1 = " << field.geo.total_site(0) << endl;
-		header_stream << "DIMENSION_2 = " << field.geo.total_site(1) << endl;
-		header_stream << "DIMENSION_3 = " << field.geo.total_site(2) << endl;
-		header_stream << "DIMENSION_4 = " << field.geo.total_site(3) << endl;
+		header_stream << "DIMENSION_1 = " << field.geo.total_site()[0] << endl;
+		header_stream << "DIMENSION_2 = " << field.geo.total_site()[1] << endl;
+		header_stream << "DIMENSION_3 = " << field.geo.total_site()[2] << endl;
+		header_stream << "DIMENSION_4 = " << field.geo.total_site()[3] << endl;
 		header_stream << "CRC32HASH = " << crc32Hash << endl;
 		header_stream << "CHECKSUM = " << checksumSum.str() << endl;
 		
@@ -283,10 +267,10 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 			header_stream << "HDR_VERSION = 1.0" << endl;
 			if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
 			else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
-			header_stream << "DIMENSION_1 = " << field.geo.total_site(0) << endl;
-			header_stream << "DIMENSION_2 = " << field.geo.total_site(1) << endl;
-			header_stream << "DIMENSION_3 = " << field.geo.total_site(2) << endl;
-			header_stream << "DIMENSION_4 = " << field.geo.total_site(3) << endl;
+			header_stream << "DIMENSION_1 = " << field.geo.total_site()[0] << endl;
+			header_stream << "DIMENSION_2 = " << field.geo.total_site()[1] << endl;
+			header_stream << "DIMENSION_3 = " << field.geo.total_site()[2] << endl;
+			header_stream << "DIMENSION_4 = " << field.geo.total_site()[3] << endl;
 			header_stream << "CRC32HASH = " << crc32Hash << endl;
 			header_stream << "CHECKSUM = " << checksumSum.str() << endl;
 			header_stream << "LINK_TRACE = " << avgReTr << endl;
