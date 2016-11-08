@@ -153,19 +153,38 @@ inline int is_constrained(const Coordinate &x, int mu, int mag)
 
 	// debug end
 
-	if(!mag) return 0; // this is not a constrained evolution: always return 0;
+	static bool initialized = false;
+	static map<Coordinate, int> hierarchy;
+	int ret;
 
-	bool is_constrained_ = true;
-	for(int i = 0; i < 4; i++){
-		if(i == mu) continue;
-		is_constrained_ = is_constrained_ && (x[i] % mag == 0);
-	}
-	if(is_constrained_){
-		if(x[mu] % mag == mag - 1) return 100;
-		if(x[mu] % mag == 0) return 10;
-		return 1;
+	if(hierarchy.count(x)){ // if already encoutered before
+		return hierarchy[x];
 	}else{
-		return 0;
+		if(!mag){
+			ret = 0; // this is not a constrained evolution: always return 0;
+		}else{
+			bool is_constrained_ = true;
+			for(int i = 0; i < 4; i++){
+				if(i == mu) continue;
+				is_constrained_ = is_constrained_ && (x[i] % mag == 0);
+			}
+			if(is_constrained_){
+				if(x[mu] % mag == mag - 1){
+					ret = 100;
+				}else{
+					if(x[mu] % mag == 0){
+						ret = 10;
+					}else{
+						ret = 1;
+					}
+				}
+			}else{
+				ret = 0;
+			}
+		}
+		
+		hierarchy[x] = ret;
+		return ret;
 	}
 }
 
