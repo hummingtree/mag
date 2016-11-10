@@ -137,20 +137,22 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
 			Coordinate x = copy.geo.coordinate_from_index(index);
+			qlat::Vector<Matrix> ix = incr.get_elems(x);
 			Matrix m;
 			for(int i = 0; i < DIM - 1; i++){
 				get_staple_spatial(m, copy, x, i);
-				incr.get_elems(x)[i] = m;
+				ix[i] = m;
 		}}
 	
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
 			Coordinate x = copy.geo.coordinate_from_index(index);
-			Matrix m;
+			qlat::Vector<Matrix> cx = copy.get_elems(x);
+			qlat::Vector<Matrix> ix = incr.get_elems(x);
 			for(int i = 0; i < DIM - 1; i++){
-				m = incr.get_elems(x)[i] * (coeff / 4.);
-				copy.get_elems(x)[i] = m + copy.get_elems(x)[i] * (1. - coeff);
-				copy.get_elems(x)[i].Unitarize();
+				cx[i] = ix[i] * (coeff / 4.) + cx[i] * (1. - coeff);
+// for Sommer scale purposes we don't need to unitarize the matrix.
+				cx[i].Unitarize();
 		}}
 	}
 	

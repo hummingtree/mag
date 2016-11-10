@@ -84,21 +84,42 @@ inline void algebra_to_group(Matrix &expiM, const Matrix &M){
 
 inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field, 
 					const Coordinate &x, const int mu){
-	vector<int> dir;
-	Matrix staple_; staple_.ZeroMatrix();
-	Matrix m;
+	Coordinate y = x;
+	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
+	vector<qlat::Vector<Matrix> > gxex(DIM * 2);
+	for(int alpha = 0; alpha < DIM; alpha++){
+		y[alpha]++;
+		gxex[alpha] = field.get_elems_const(y);
+		y[alpha]--; y[alpha]--;
+		gxex[alpha + DIM] = field.get_elems_const(y);
+	}
+	Matrix m, dagger, acc; acc.ZeroMatrix();
 	for(int nu = 0; nu < DIM; nu++){
 		if(mu == nu) continue;
-		dir.clear();
-		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
-		get_path_ordered_product(m, field, x, dir);
-		staple_ += m;
-		dir.clear();
-		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
-		get_path_ordered_product(m, field, x, dir);
-		staple_ += m;
+		dagger.Dagger(gxex[mu][nu]);
+		acc += (gx[nu] * gxex[nu][mu]) * dagger;
+		dagger.Dagger(gxex[nu + DIM][nu]);
+		Coordinate z = x; z[nu]--; z[mu]++;
+		acc += dagger * (gxex[nu + DIM][mu] * field.get_elems_const(z)[nu]);
 	}
-	staple.Dagger(staple_);
+	staple.Dagger(acc);
+
+// 	vector<int> dir;
+// 	Matrix staple_; staple_.ZeroMatrix();
+// 	Matrix m;
+// 	for(int nu = 0; nu < DIM; nu++){
+// 		if(mu == nu) continue;
+// 		dir.clear();
+// 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
+// 		get_path_ordered_product(m, field, x, dir);
+// 		staple_ += m;
+// 		dir.clear();
+// 		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
+// 		get_path_ordered_product(m, field, x, dir);
+// 		staple_ += m;
+// 	}
+// 	staple.Dagger(staple_);
+
 }
 
 inline void rn_filling_SHA256_gaussian(std::vector<double> &xs)
@@ -171,7 +192,7 @@ inline int is_constrained(const Coordinate &x, int mu, int mag)
 
 inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 			const Arg_chmc &arg){
-	TIMER("getFoece()");
+	TIMER("get_force()");
 	assert(is_matching_geo(fField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < fField.geo.local_volume(); index++){
@@ -216,7 +237,7 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 inline void evolve_momentum(Field<Matrix> &mField, 
 				const Field<Matrix> &fField, double dt, 
 				const Arg_chmc &arg){
-	TIMER("algCHmcWilson::evolve_momentum()");
+	TIMER("evolve_momentum()");
 	assert(is_matching_geo(mField.geo, fField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
@@ -231,7 +252,7 @@ inline void evolve_momentum(Field<Matrix> &mField,
 inline void evolve_gauge_field(Field<Matrix> &gField, 
 				const Field<Matrix> &mField, double dt, 
 				const Arg_chmc &arg){
-	TIMER("algCHmcWilson::evolve_gauge_field()");
+	TIMER("evolve_gauge_field()");
 	assert(is_matching_geo(mField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < gField.geo.local_volume(); index++){
