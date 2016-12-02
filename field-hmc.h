@@ -82,44 +82,120 @@ inline void algebra_to_group(Matrix &expiM, const Matrix &M){
 	exp(expiM, mTemp);
 }
 
+inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
+														const Coordinate &x, int mu){
+	// Assuming properly communicated
+ 	vector<int> dir; dir.reserve(5);
+ 	Matrix rec_, m; rec_.ZeroMatrix();
+ 	for(int nu = 0; nu < DIM; nu++){
+ 		if(mu == nu) continue;
+ 		
+		dir.clear();
+ 		dir.push_back(nu); 
+		dir.push_back(mu);
+		dir.push_back(mu);
+		dir.push_back(nu + DIM);
+		dir.push_back(mu + DIM);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;
+ 		
+		dir.clear();
+ 		dir.push_back(nu + DIM); 
+		dir.push_back(mu);
+		dir.push_back(mu);
+		dir.push_back(nu);
+		dir.push_back(mu + DIM);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;
+
+		dir.clear();
+ 		dir.push_back(nu); 
+		dir.push_back(nu);
+		dir.push_back(mu);
+		dir.push_back(nu + DIM);
+		dir.push_back(nu + DIM);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;
+
+		dir.clear();
+ 		dir.push_back(nu + DIM); 
+		dir.push_back(nu + DIM);
+		dir.push_back(mu);
+		dir.push_back(nu);
+		dir.push_back(nu);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;	
+
+		dir.clear();
+ 		dir.push_back(mu + DIM); 
+		dir.push_back(nu);
+		dir.push_back(mu);
+		dir.push_back(mu);
+		dir.push_back(nu + DIM);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;
+	
+		dir.clear();
+ 		dir.push_back(mu + DIM); 
+		dir.push_back(nu + DIM);
+		dir.push_back(mu);
+		dir.push_back(mu);
+		dir.push_back(nu);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		rec_ += m;	
+	}
+	
+	rec.Dagger(rec_);
+}
+
 inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field, 
-					const Coordinate &x, const int mu){
-	Coordinate y = x;
-	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
-	vector<qlat::Vector<Matrix> > gxex(DIM * 2);
-	for(int alpha = 0; alpha < DIM; alpha++){
-		y[alpha]++;
-		gxex[alpha] = field.get_elems_const(y);
-		y[alpha]--; y[alpha]--;
-		gxex[alpha + DIM] = field.get_elems_const(y);
-	}
-	Matrix m, dagger, acc; acc.ZeroMatrix();
-	for(int nu = 0; nu < DIM; nu++){
-		if(mu == nu) continue;
-		dagger.Dagger(gxex[mu][nu]);
-		acc += (gx[nu] * gxex[nu][mu]) * dagger;
-		dagger.Dagger(gxex[nu + DIM][nu]);
-		Coordinate z = x; z[nu]--; z[mu]++;
-		acc += dagger * (gxex[nu + DIM][mu] * field.get_elems_const(z)[nu]);
-	}
-	staple.Dagger(acc);
+														const Coordinate &x, int mu){
+//	Coordinate y = x;
+//	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
+//	vector<qlat::Vector<Matrix> > gxex(DIM * 2);
+//	for(int alpha = 0; alpha < DIM; alpha++){
+//		y[alpha]++;
+//		gxex[alpha] = field.get_elems_const(y);
+//		y[alpha] -= 2;
+//		gxex[alpha + DIM] = field.get_elems_const(y);
+//		y[alpha]++;
+//	}
+//	Matrix m, dagger, acc; acc.ZeroMatrix();
+//	for(int nu = 0; nu < DIM; nu++){
+//		if(mu == nu) continue;
+//		dagger.Dagger(gxex[mu][nu]);
+//		acc += (gx[nu] * gxex[nu][mu]) * dagger;
+//		dagger.Dagger(gxex[nu + DIM][nu]);
+//		Coordinate z = x; z[nu]--; z[mu]++;
+//		acc += dagger * (gxex[nu + DIM][mu] * field.get_elems_const(z)[nu]);
+//	}
+//	staple.Dagger(acc);
 
-// 	vector<int> dir;
-// 	Matrix staple_; staple_.ZeroMatrix();
-// 	Matrix m;
-// 	for(int nu = 0; nu < DIM; nu++){
-// 		if(mu == nu) continue;
-// 		dir.clear();
-// 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
-// 		get_path_ordered_product(m, field, x, dir);
-// 		staple_ += m;
-// 		dir.clear();
-// 		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
-// 		get_path_ordered_product(m, field, x, dir);
-// 		staple_ += m;
-// 	}
-// 	staple.Dagger(staple_);
+ 	vector<int> dir; dir.reserve(3);
+ 	Matrix staple_; staple_.ZeroMatrix();
+ 	Matrix m;
+ 	for(int nu = 0; nu < DIM; nu++){
+ 		if(mu == nu) continue;
+ 		dir.clear();
+ 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		staple_ += m;
+ 		dir.clear();
+ 		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
+ 		get_path_ordered_product(m, field, x, dir);
+ 		staple_ += m;
+ 	}
+ 	staple.Dagger(staple_);
 
+}
+
+inline void get_extended_staple_dagger(Matrix &stp, const Field<Matrix> &f,
+									const Coordinate &x, int mu, double c1){
+	double c0 = (1 - 8. * c1);
+	Matrix m0, m1;
+	get_staple_dagger(m0, f, x, mu);
+	get_rectangular_dagger(m1, f, x, mu);
+	stp = m0 * c0 + m1 * c1; 
 }
 
 inline void rn_filling_SHA256_gaussian(std::vector<double> &xs)
@@ -194,44 +270,88 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 			const Arg_chmc &arg){
 	TIMER("get_force()");
 	assert(is_matching_geo(fField.geo, gField.geo));
+
+	if(arg.gauge.type == qlat::WILSON){
 #pragma omp parallel for
-	for(long index = 0; index < fField.geo.local_volume(); index++){
-		Coordinate x; 
-		Matrix mStaple1, mStaple2, mTemp;
-		x = fField.geo.coordinate_from_index(index);
-		const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
-			  qlat::Vector<Matrix> fx = fField.get_elems(x);
-		for(int mu = 0; mu < fField.geo.multiplicity; mu++){
-			switch(is_constrained(x, mu, arg.mag)){
-			case 0: {
-				get_staple_dagger(mStaple1, gField, x, mu);
-				mTemp = gx[mu] * mStaple1;
-				break;
-			}
-			case 1:
-			case 10: {
-				Coordinate y(x); y[mu]++;
-				get_staple_dagger(mStaple1, gField, x, mu);
-				get_staple_dagger(mStaple2, gField, y, mu);
-				mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
-				break;
-			}
-			case 100: mTemp.ZeroMatrix(); break;
+		for(long index = 0; index < fField.geo.local_volume(); index++){
+			Coordinate x; 
+			Matrix mStaple1, mStaple2, mTemp;
+			x = fField.geo.coordinate_from_index(index);
+			const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
+			qlat::Vector<Matrix> fx = fField.get_elems(x);
+			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
+				switch(is_constrained(x, mu, arg.mag)){
+				case 0: {
+					get_staple_dagger(mStaple1, gField, x, mu);
+					mTemp = gx[mu] * mStaple1;
+					break;
+				}
+				case 1:
+				case 10: {
+					Coordinate y(x); y[mu]++;
+					get_staple_dagger(mStaple1, gField, x, mu);
+					get_staple_dagger(mStaple2, gField, y, mu);
+					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
+					break;
+				}
+				case 100: mTemp.ZeroMatrix(); break;
+			
+			// 	test case start
+			// 	case 100: {
+			// 		get_staple_dagger(mStaple1, gField, x, mu);
+			// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
+			// 		break;
+			// 	} 
+		 	// 	test case end
 		
-			// test case start
-		// 	case 100: {
-		// 		get_staple_dagger(mStaple1, gField, x, mu);
-		// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
-		// 		break;
-		// 	} 
-		 	// test case end
+			 	default: assert(false);
+				}
+		
+				mTemp.TrLessAntiHermMatrix(); 
+				fx[mu] = mTemp * qlat::Complex(0., arg.beta / 3.);
+		}}
+	}
+	if(arg.gauge.type == IWASAKI){
+#pragma omp parallel for
+		for(long index = 0; index < fField.geo.local_volume(); index++){
+			Coordinate x; 
+			Matrix mStaple1, mStaple2, mTemp;
+			x = fField.geo.coordinate_from_index(index);
+			const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
+			qlat::Vector<Matrix> fx = fField.get_elems(x);
+			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
+				switch(is_constrained(x, mu, arg.mag)){
+				case 0: {
+					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
+					mTemp = gx[mu] * mStaple1;
+					break;
+				}
+				case 1:
+				case 10: {
+					Coordinate y(x); y[mu]++;
+					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
+					get_extended_staple_dagger(mStaple2, gField, y, mu, arg.gauge.c1);
+					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
+					break;
+				}
+				case 100: mTemp.ZeroMatrix(); break;
+			
+			// 	test case start
+			// 	case 100: {
+			// 		get_staple_dagger(mStaple1, gField, x, mu);
+			// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
+			// 		break;
+			// 	} 
+		 	// 	test case end
+		
+			 	default: assert(false);
+				}
+		
+				mTemp.TrLessAntiHermMatrix(); 
+				fx[mu] = mTemp * qlat::Complex(0., arg.beta / 3.);
+		}}
 	
-		 	default: assert(false);
-			}
-	
-			mTemp.TrLessAntiHermMatrix(); 
-			fx[mu] = mTemp * qlat::Complex(0., arg.beta / 3.);
-	}}
+	}
 }
 
 inline void evolve_momentum(Field<Matrix> &mField, 
@@ -340,7 +460,7 @@ inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField,
 	static Field<Matrix> fField; fField.init(geo_);
 	evolve_gauge_field(gField, mField, arg.dt / 2., arg);
 	for(int i = 0; i < arg.trajectory_length; i++){
-		fetch_expanded(gField);
+		fetch_expanded_chart(gField, arg.chart);
 		get_force(fField, gField, arg);
 		evolve_momentum(mField, fField, arg.dt, arg);
 		if(i < arg.trajectory_length - 1) 
@@ -350,7 +470,7 @@ inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField,
 }
 
 inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
-				const Arg_chmc &arg){
+				const Arg_chmc &arg, vector<double> &part){
 	
 	TIMER("get_hamiltonian()");
 	double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
@@ -390,9 +510,20 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 	double globalSum;
 	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 	double kineticEnergy = globalSum / 2.;
-	fetch_expanded(gField);
-	double potentialEnergy = -total_plaq(gField) * arg.beta / 3.;
-	return kineticEnergy + potentialEnergy;
+	fetch_expanded_chart(gField, arg.chart);
+	double potential_energy = 0.;
+	if(arg.gauge.type == qlat::WILSON){
+		potential_energy = -total_plaq(gField) * arg.beta / 3.;
+	}
+	if(arg.gauge.type == IWASAKI){
+		double p1 = -total_plaq(gField);
+		double p2 = -total_rectangular(gField);
+		potential_energy = (p1 * (1. - 8. * arg.gauge.c1) + p2 * arg.gauge.c1) 
+																* arg.beta / 3.;
+	}
+	part.resize(2);
+	part[0] = kineticEnergy; part[1] = potential_energy;
+	return kineticEnergy + potential_energy;
 }
 
 inline void init_momentum(Field<Matrix> &mField){
@@ -430,6 +561,18 @@ inline double derivative(const Field<Matrix> &gField,
 	return temp.ReTr();
 }
 
+inline double derivative_Iwasaki(const Field<Matrix> &gField, 
+									const Coordinate &x, int mu, int a, const Arg_chmc &arg){
+	double c1 = arg.gauge.c1;
+	double c0 = 1. - 8. * c1;
+	Matrix &u = gField.get_elems_const(x)[mu];
+	Matrix stp_dagger; get_staple_dagger(stp_dagger, gField, x, mu);
+	Matrix rtg_dagger; get_rectangular_dagger(rtg_dagger, gField, x, mu);
+	Matrix tot_dagger = stp_dagger * c0 + rtg_dagger * c1;
+	Matrix temp = su3_generators[a] * u * tot_dagger * qlat::Complex(0., 1.);
+	return temp.ReTr();
+}
+
 inline double derivative_pair(const Field<Matrix> &gField,
 								const Coordinate &x, int mu, int b){
 	Coordinate y = x; y[mu]++;
@@ -447,7 +590,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 	for(int i = 0; i < DIM; i++){
 		assert(gField.geo.node_site[i] % dField.geo.node_site[i] == 0); 
 	}
-	fetch_expanded(gField);
+	fetch_expanded_chart(gField, arg.chart);
 #pragma omp parallel for
 	for(long index = 0; index < dField.geo.local_volume(); index++){
 		Coordinate x = dField.geo.coordinate_from_index(index);
@@ -457,16 +600,16 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
 			if(does_pair)
-				dx[spin_color_index] = derivative(gField, arg.mag * x, mu, a)
+				dx[spin_color_index] = derivative_Iwasaki(gField, arg.mag * x, mu, a, arg)
 									+ derivative_pair(gField, arg.mag * x, mu, (a+3)%8);
 			else
-				dx[spin_color_index] = derivative(gField, arg.mag * x, mu, a);
+				dx[spin_color_index] = derivative_Iwasaki(gField, arg.mag * x, mu, a, arg);
 		}}
 	}
 }
 
 inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
-	fetch_expanded(gField);
+	fetch_expanded_chart(gField, arg.chart);
 	double local_sum = 0.;
 	long count;
 	for(int x = 0; x < gField.geo.node_site[0]; x += arg.mag){
@@ -488,13 +631,13 @@ inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
 }
 
 inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile){
-	TIMER("algCHmcWilson::runHMC()");
+	TIMER("run_chmc()");
 	if(!get_id_node()) assert(pFile != NULL);
 	assert(arg.num_trajectory > 20);
 
 	RngState globalRngState("By the witness of the martyrs.");
 
-	Coordinate expansion(1, 1, 1, 1);
+	Coordinate expansion(2, 2, 2, 2);
 	Geometry geoExpand1 = gFieldExt.geo; geoExpand1.resize(expansion, expansion);
 	Geometry geoLocal = gFieldExt.geo;
 	Field<Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
@@ -519,17 +662,18 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	double deltaH, percentDeltaH;
 	double acceptProbability;
 	double avgPlaq;
+	vector<double> energy_partition_old, energy_partition_new;
 	bool doesAccept;
 	int numAccept = 0, numReject = 0;
 
 	for(int i = 0; i < arg.num_trajectory; i++){
 		init_momentum(mField);
 		
-		oldH = get_hamiltonian(gField, mField, arg);
+		oldH = get_hamiltonian(gField, mField, arg, energy_partition_old);
 		// leapFrogIntegrator(gField, mField, arg);
 		force_gradient_integrator(gField, mField, arg, chart);
 		
-		newH = get_hamiltonian(gField, mField, arg);
+		newH = get_hamiltonian(gField, mField, arg, energy_partition_new);
 	
 		dieRoll = u_rand_gen(globalRngState);
 		deltaH = newH - oldH;
@@ -574,8 +718,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 //		double dv_sum = derivative_sum(gField, arg);
 //		report << "FINE DERIVATIVE SUM =\t" << dv_sum << endl;
 
-		Fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\n", i + 1, 
-			abs(deltaH), acceptProbability, avgPlaq, doesAccept);
+		Fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
+				i + 1, abs(deltaH), acceptProbability, avgPlaq, doesAccept, 
+				doesAccept?energy_partition_new[1]:energy_partition_old[1]);
 		Fflush(pFile);
 
 		if((i + 1) % arg.num_step_between_output == 0 

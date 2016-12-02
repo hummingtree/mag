@@ -86,6 +86,59 @@ inline double get_plaq(const Field<Matrix> &f, const Coordinate &x){
 	return ret;
 }
 
+inline int symmetric_index_mapping(int mu, int nu){
+	return DIM * nu + mu - (nu + 1) * (nu + 2) / 2;
+}
+
+inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
+	// assuming properly communicated.
+
+	TIMER("get_rectangular()");
+	const qlat::Vector<Matrix> gx_0_0 = f.get_elems_const(x);
+	vector<qlat::Vector<Matrix> > gx_1_0(DIM);
+	vector<qlat::Vector<Matrix> > gx_2_0(DIM);
+	vector<qlat::Vector<Matrix> > gx_1_1(6);
+
+	Coordinate y;
+	for(int mu = 0; mu < DIM; mu++){
+		y = x; y[mu]++;
+		gx_1_0[mu] = f.get_elems_const(y);
+	}
+
+	for(int mu = 0; mu < DIM; mu++){
+		y = x; y[mu] += 2;
+		gx_2_0[mu] = f.get_elems_const(y);
+	}
+
+	for(int mu = 0; mu < DIM; mu++){
+	for(int nu = 0; nu < mu; nu++){
+		y = x; y[mu]++; y[nu]++;
+//		printf("gx_1_1 index = %d", symmetric_index_mapping(mu, nu));
+		gx_1_1[symmetric_index_mapping(mu, nu)] = f.get_elems_const(y);
+	}}
+	
+	//        mu
+	//      0 1 2 3
+	//    0 x 0 1 2
+	//    1   x 3 4
+	// nu 2     x 5
+	//    3       x
+	double sum = 0.;
+	Matrix m;
+	for(int mu = 0; mu < DIM; mu++){
+	for(int nu = 0; nu < mu; nu++){
+		int symmetric_index = symmetric_index_mapping(mu, nu);
+		
+		m.Dagger(gx_0_0[mu] * gx_1_0[mu][nu] * gx_1_1[symmetric_index][nu]);
+		sum += (gx_0_0[nu] * gx_1_0[nu][nu] * gx_2_0[nu][mu] * m).ReTr();
+	
+		m.Dagger(gx_0_0[mu] * gx_1_0[mu][mu] * gx_2_0[mu][nu]);
+		sum += (gx_0_0[nu] * gx_1_0[nu][mu] * gx_1_1[symmetric_index][mu] * m).ReTr();
+	}}
+
+	return sum;
+}
+
 inline double total_plaq(const qlat::Field<Matrix> &f){
 	// assuming properly communicated.
 	TIMER("total_plaq()");
@@ -105,6 +158,39 @@ inline double total_plaq(const qlat::Field<Matrix> &f){
 	for(long index = 0; index < f.geo.local_volume(); index++){
 		Coordinate x = f.geo.coordinate_from_index(index);
 			p_local_sum += get_plaq(f, x);
+	}
+		pp_local_sum[omp_get_thread_num()] = p_local_sum;
+}
+
+	for(int i = 0; i < num_threads; i++){
+		local_sum += pp_local_sum[i];
+	}
+
+	double global_sum;
+	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
+
+	return global_sum;
+}
+
+inline double total_rectangular(const qlat::Field<Matrix> &f){
+	// assuming properly communicated.
+	TIMER("total_rectangular()");
+	double local_sum = 0.;
+	int num_threads;
+	vector<double> pp_local_sum;
+
+#pragma omp parallel
+{
+	if(omp_get_thread_num() == 0){
+		num_threads = omp_get_num_threads();
+		pp_local_sum.resize(num_threads);
+	}
+	double p_local_sum = 0.;
+#pragma omp barrier
+#pragma omp for
+	for(long index = 0; index < f.geo.local_volume(); index++){
+		Coordinate x = f.geo.coordinate_from_index(index);
+			p_local_sum += get_rectangular(f, x);
 	}
 		pp_local_sum[omp_get_thread_num()] = p_local_sum;
 }
