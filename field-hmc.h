@@ -413,7 +413,7 @@ inline void evolve_gauge_field(Field<Matrix> &gField,
 
 inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 					const Arg_chmc &arg, Chart<Matrix> &chart){
-    	TIMER("force_gradient_integrator()"); 
+	TIMER("force_gradient_integrator()"); 
 
 	assert(is_matching_geo(gField.geo, mField.geo));
 	const double alpha = (3. - sqrt(3.)) * arg.dt / 6.;
@@ -452,7 +452,7 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 }
 
 inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-				const Arg_chmc &arg){
+				const Arg_chmc &arg, Chart<Matrix> chart){
 	TIMER("leap_frog_integrator()");
 	assert(is_matching_geo(gField.geo, mField.geo));
 	Geometry geo_; 
@@ -460,7 +460,7 @@ inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField,
 	static Field<Matrix> fField; fField.init(geo_);
 	evolve_gauge_field(gField, mField, arg.dt / 2., arg);
 	for(int i = 0; i < arg.trajectory_length; i++){
-		fetch_expanded_chart(gField, arg.chart);
+		fetch_expanded_chart(gField, chart);
 		get_force(fField, gField, arg);
 		evolve_momentum(mField, fField, arg.dt, arg);
 		if(i < arg.trajectory_length - 1) 
@@ -470,7 +470,7 @@ inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField,
 }
 
 inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
-				const Arg_chmc &arg, vector<double> &part){
+				const Arg_chmc &arg, Chart<Matrix> &chart, vector<double> &part){
 	
 	TIMER("get_hamiltonian()");
 	double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
@@ -510,7 +510,7 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 	double globalSum;
 	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 	double kineticEnergy = globalSum / 2.;
-	fetch_expanded_chart(gField, arg.chart);
+	fetch_expanded_chart(gField, chart);
 	double potential_energy = 0.;
 	if(arg.gauge.type == qlat::WILSON){
 		potential_energy = -total_plaq(gField) * arg.beta / 3.;
@@ -590,7 +590,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 	for(int i = 0; i < DIM; i++){
 		assert(gField.geo.node_site[i] % dField.geo.node_site[i] == 0); 
 	}
-	fetch_expanded_chart(gField, arg.chart);
+	fetch_expanded(gField);
 #pragma omp parallel for
 	for(long index = 0; index < dField.geo.local_volume(); index++){
 		Coordinate x = dField.geo.coordinate_from_index(index);
@@ -609,7 +609,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 }
 
 inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
-	fetch_expanded_chart(gField, arg.chart);
+	fetch_expanded(gField);
 	double local_sum = 0.;
 	long count;
 	for(int x = 0; x < gField.geo.node_site[0]; x += arg.mag){
@@ -669,11 +669,11 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	for(int i = 0; i < arg.num_trajectory; i++){
 		init_momentum(mField);
 		
-		oldH = get_hamiltonian(gField, mField, arg, energy_partition_old);
+		oldH = get_hamiltonian(gField, mField, arg, chart, energy_partition_old);
 		// leapFrogIntegrator(gField, mField, arg);
 		force_gradient_integrator(gField, mField, arg, chart);
 		
-		newH = get_hamiltonian(gField, mField, arg, energy_partition_new);
+		newH = get_hamiltonian(gField, mField, arg, chart, energy_partition_new);
 	
 		dieRoll = u_rand_gen(globalRngState);
 		deltaH = newH - oldH;
