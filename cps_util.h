@@ -21,7 +21,8 @@
 
 #include <iostream>
 
-#include <qlat/coordinate.h>
+#include <qlat/qlat.h>
+#include <timer.h>
 
 #include "field-matrix.h"
 
