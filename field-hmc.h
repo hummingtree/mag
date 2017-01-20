@@ -413,6 +413,7 @@ inline void evolve_gauge_field(Field<Matrix> &gField,
 
 inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 					const Arg_chmc &arg, Chart<Matrix> &chart){
+	// now this CANNOT be used in a multigrid algorithm
 	TIMER("force_gradient_integrator()"); 
 
 	assert(is_matching_geo(gField.geo, mField.geo));
@@ -451,8 +452,59 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
 }
 
+inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
+										Field<Matrix> &gFieldAuxil, Field<Matrix> &fField,
+										const Arg_chmc &arg, Chart<Matrix> &chart){
+	// now this CANNOT be used in a multigrid algorithm
+	sync_node();
+	TIMER("force_gradient_integrator()"); 
+
+	qlat::Printf(show(gField.geo).c_str());
+	qlat::Printf(show(mField.geo).c_str());
+	qlat::Printf(show(fField.geo).c_str());
+	qlat::Printf(show(gFieldAuxil.geo).c_str());
+
+	assert(is_matching_geo(gField.geo, mField.geo));
+	assert(is_matching_geo(gField.geo, fField.geo));
+	assert(is_matching_geo(gField.geo, gFieldAuxil.geo));
+	const double alpha = (3. - sqrt(3.)) * arg.dt / 6.;
+	const double beta = arg.dt / sqrt(3.);
+	const double gamma = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
+
+	evolve_gauge_field(gField, mField, alpha, arg);
+
+
+	sync_node();
+	for(int i = 0; i < arg.trajectory_length; i++){
+		fetch_expanded_chart(gField, chart);
+		get_force(fField, gField, arg);
+		gFieldAuxil = gField;
+		evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
+		fetch_expanded_chart(gFieldAuxil, chart);
+		get_force(fField, gFieldAuxil, arg);
+		evolve_momentum(mField, fField, 0.5 * arg.dt, arg);
+
+		evolve_gauge_field(gField, mField, beta, arg);
+	
+		fetch_expanded_chart(gField, chart);
+		get_force(fField, gField, arg);
+		gFieldAuxil = gField;
+		evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
+		fetch_expanded_chart(gFieldAuxil, chart);
+		get_force(fField, gFieldAuxil, arg);
+		evolve_momentum(mField, fField, 0.5 * arg.dt, arg);
+
+		if(i < arg.trajectory_length - 1) 
+			evolve_gauge_field(gField, mField, 2. * alpha, arg);
+		else evolve_gauge_field(gField, mField, alpha, arg);
+	}
+	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
+}
+
 inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
 				const Arg_chmc &arg, Chart<Matrix> chart){
+	// not for multigrid
+
 	TIMER("leap_frog_integrator()");
 	assert(is_matching_geo(gField.geo, mField.geo));
 	Geometry geo_; 
@@ -538,6 +590,24 @@ inline void init_momentum(Field<Matrix> &mField){
 		rng_field.init(rng_geo, RngState("Ich liebe dich."));
 		initialized = true;
 	}
+
+#pragma omp parallel for
+	for(long index = 0; index < mField.geo.local_volume(); index++){
+		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Vector<Matrix> mx = mField.get_elems(x);
+		Matrix mTemp;
+		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
+			mTemp.ZeroMatrix();
+			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
+				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x));
+			}
+			mx[mu] = mTemp;
+	}}
+}
+
+inline void init_momentum(Field<Matrix> &mField, RngField &rng_field){
+	TIMER("init_momentum()");
+	using namespace qlat;
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
@@ -759,7 +829,8 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	Timer::display();
 }
 
-inline void one_step(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Matrix> &mField, 
+inline void update_field(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Matrix> &mField,
+						Field<Matrix> &gFieldAuxil, Field<Matrix> &fField, RngField &rng_field, 
 						const Arg_chmc &arg, Chart<Matrix> &chart, FILE *p_summary, int count, 
 						RngState &globalRngState){
 
@@ -775,11 +846,11 @@ inline void one_step(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Mat
 	static bool does_accept;
 	static int num_accept = 0;
 	static int num_reject = 0;
-	
-	init_momentum(mField);
-	
+
+	init_momentum(mField, rng_field);
+
 	old_hamiltonian = get_hamiltonian(gField, mField, arg, chart, old_energy_partition);
-	force_gradient_integrator(gField, mField, arg, chart);
+	force_gradient_integrator(gField, mField, gFieldAuxil, fField, arg, chart);
 	new_hamiltonian = get_hamiltonian(gField, mField, arg, chart, new_energy_partition);
 
 	die_roll = u_rand_gen(globalRngState);
@@ -840,6 +911,29 @@ inline void one_step(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Mat
 
 }
 
+inline void update_constrain(Field<Matrix> &gField, const Field<Matrix> &gField_coarse, 
+								const Arg_chmc &arg){
+	assert(gField.geo.total_site() == arg.mag * gField_coarse.geo.total_site());
+	
+	sync_node();
+#pragma omp parallel for
+    for(long index = 0; index < gField_coarse.geo.local_volume(); index++){
+		Coordinate xC = gField_coarse.geo.coordinate_from_index(index);
+		Coordinate x = arg.mag * xC;
+		qlat::Vector<Matrix> pC = gField_coarse.get_elems_const(xC);
+		qlat::Vector<Matrix> p = gField.get_elems(x);
+		for(int mu = 0; mu < gField_coarse.geo.multiplicity; mu++){
+			Coordinate xP = x; xP[mu]++;
+			vector<int> cotta(arg.mag - 1, mu);
+			Matrix m;
+			get_path_ordered_product(m, gField, xP, cotta);
+			Matrix d; d.Dagger(m);
+			p[mu] = pC[mu] * d;
+    }}
+    sync_node();
+    qlat::Printf("Coarse lattice initialized.\n");
+}
+
 inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg, 
 														const Arg_chmc &arg_coarse){
 	
@@ -877,7 +971,14 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 	Geometry geo_expanded = gField_ext.geo; geo_expanded.resize(expansion, expansion);
 	Geometry geo_local = gField_ext.geo;
 	Field<Matrix> gField; gField.init(geo_expanded); gField = gField_ext;
-	Field<Matrix> mField; mField.init(geo_local);
+	Field<Matrix> gField_auxil; gField_auxil.init(geo_expanded);
+	Field<Matrix> mField; mField.init(geo_expanded);
+	Field<Matrix> fField; fField.init(geo_expanded);
+
+	Geometry rng_geo; 
+	rng_geo.init(mField.geo.geon, 1, mField.geo.node_site);
+	RngField rng_field; 
+	rng_field.init(rng_geo, RngState("Ich liebe dich."));
 
 	//declare coarse lattice variables
 	Coordinate total_size_coarse;
@@ -888,7 +989,10 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 	Geometry geo_local_coarse; geo_local_coarse.init(total_size_coarse, DIM);
 	Geometry geo_expanded_coarse = geo_local_coarse; geo_expanded_coarse.resize(expansion, expansion);
 	Field<Matrix> gField_coarse; gField_coarse.init(geo_expanded_coarse);
-	Field<Matrix> mField_coarse; mField_coarse.init(geo_local_coarse);
+	Field<Matrix> gField_ext_coarse; gField_ext_coarse.init(geo_expanded_coarse);
+	Field<Matrix> gField_auxil_coarse; gField_auxil_coarse.init(geo_expanded_coarse);
+	Field<Matrix> mField_coarse; mField_coarse.init(geo_expanded_coarse);
+	Field<Matrix> fField_coarse; fField_coarse.init(geo_expanded_coarse);
 	
 	// initialize the coarse field.
 	sync_node();
@@ -903,11 +1007,17 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
     sync_node();
     qlat::Printf("Coarse lattice initialized.\n");
 
+	gField_ext_coarse = gField_coarse;
+
 	fetch_expanded(gField_coarse);
 	fetch_expanded(gField);
-    qlat::Printf("CONSTRAINED Plaquette = %.12f\n", 
-										check_constrained_plaquette(gField, arg.mag));
+    qlat::Printf("CONSTRAINED Plaquette = %.12f\n", check_constrained_plaquette(gField, arg.mag));
     qlat::Printf("COARSE      Plaquette = %.12f\n", avg_plaquette(gField_coarse));	
+
+	Geometry rng_geo_coarse; 
+	rng_geo_coarse.init(mField_coarse.geo.geon, 1, mField_coarse.geo.node_site);
+	RngField rng_field_coarse; 
+	rng_field_coarse.init(rng_geo_coarse, RngState("Tut mir leid."));
 
 	// declare the communication patterns
 	Chart<Matrix> chart;
@@ -1012,8 +1122,22 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 		
 		// start fine lattice update
 
-		one_step(gField_ext, gField, mField, arg, chart, p, i, globalRngState);
+		for(int r = 0; r < 4; r++){
+			update_field(gField_ext, gField, mField, gField_auxil, fField, rng_field, 
+						arg, chart, p, i, globalRngState);
+		}
+		
+		update_field(gField_ext_coarse, gField_coarse, mField_coarse, gField_auxil_coarse, 
+						fField_coarse, rng_field_coarse, arg_coarse, chart_coarse, 
+						p, i, globalRngState);
 
+		update_constrain(gField, gField_coarse, arg);
+		gField_ext = gField;
+
+		fetch_expanded_chart(gField_coarse, chart_coarse);
+		fetch_expanded_chart(gField, chart);
+   		qlat::Printf("CONSTRAINED Plaquette = %.12f\n", check_constrained_plaquette(gField, arg.mag));
+    	qlat::Printf("COARSE      Plaquette = %.12f\n", avg_plaquette(gField_coarse));
 		// end fine lattice update
 		// start coarse lattice update
 		// end coarse lattice update
