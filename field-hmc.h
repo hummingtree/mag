@@ -448,7 +448,7 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 			evolve_gauge_field(gField, mField, 2. * alpha, arg);
 		else evolve_gauge_field(gField, mField, alpha, arg);
 	}
-	report << "reunitarize: max deviation = " << reunitarize(gField) << endl;
+	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
 }
 
 inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
@@ -553,8 +553,7 @@ inline void init_momentum(Field<Matrix> &mField){
 	}}
 }
 
-inline double derivative(const Field<Matrix> &gField, 
-							const Coordinate &x, int mu, int a){
+inline double derivative(const Field<Matrix> &gField, const Coordinate &x, int mu, int a){
 	Matrix &U = gField.get_elems_const(x)[mu];
 	Matrix V_dagger; get_staple_dagger(V_dagger, gField, x, mu);
 	Matrix temp = su3_generators[a] * U * V_dagger * qlat::Complex(0., 1.);
@@ -573,8 +572,7 @@ inline double derivative_Iwasaki(const Field<Matrix> &gField,
 	return temp.ReTr();
 }
 
-inline double derivative_pair(const Field<Matrix> &gField,
-								const Coordinate &x, int mu, int b){
+inline double derivative_pair(const Field<Matrix> &gField, const Coordinate &x, int mu, int b){
 	Coordinate y = x; y[mu]++;
 	Matrix &U1 = gField.get_elems_const(x)[mu];								
 	Matrix &U2 = gField.get_elems_const(y)[mu];
@@ -626,7 +624,7 @@ inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
 	double global_sum;
 	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
-	report << "derivative_sum(): mag = " << arg.mag << "\tcount = " << count << endl; 
+	Printf("derivative_sum(): mag = %d\tcount = %d", arg.mag, count); 
 	return global_sum;
 }
 
@@ -684,19 +682,19 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 		// make sure that all the node make the same decision.
 		
 		if(i < arg.num_forced_accept_step){
-			report << "End trajectory " << i + 1
-				<< ":\tFORCE ACCEPT." << endl;
+//			report << "End trajectory " << i + 1
+//				<< ":\tFORCE ACCEPT." << endl;
 			gFieldExt = gField;
 			doesAccept = true;
 		}else{
 			if(doesAccept){
-				report << "End trajectory " << i + 1
-					<< ":\tACCEPT." << endl;
+//				report << "End trajectory " << i + 1
+//					<< ":\tACCEPT." << endl;
 				numAccept++;
 				gFieldExt = gField;
 			}else{
-				report << "End trajectory " << i + 1
-					<< ":\tREJECT." << endl;
+//				report << "End trajectory " << i + 1
+//					<< ":\tREJECT." << endl;
 				numReject++;
 				gField = gFieldExt;	
 			}	
@@ -757,6 +755,270 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 
 	Fprintf(pFile, "Accept Rate = %.4f\n", (double)numAccept / (numAccept + numReject));
 	Fflush(pFile);
+
+	Timer::display();
+}
+
+inline void one_step(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Matrix> &mField, 
+						const Arg_chmc &arg, Chart<Matrix> &chart, FILE *p_summary, int count, 
+						RngState &globalRngState){
+
+	static double old_hamiltonian;
+	static double new_hamiltonian;
+	static double die_roll;
+	static double del_hamiltonian;
+	static double accept_probability;
+	static double average_plaquette;
+
+	static vector<double> old_energy_partition;
+	static vector<double> new_energy_partition;
+	static bool does_accept;
+	static int num_accept = 0;
+	static int num_reject = 0;
+	
+	init_momentum(mField);
+	
+	old_hamiltonian = get_hamiltonian(gField, mField, arg, chart, old_energy_partition);
+	force_gradient_integrator(gField, mField, arg, chart);
+	new_hamiltonian = get_hamiltonian(gField, mField, arg, chart, new_energy_partition);
+
+	die_roll = u_rand_gen(globalRngState);
+	del_hamiltonian = new_hamiltonian - old_hamiltonian;
+	accept_probability = exp(old_hamiltonian - new_hamiltonian);
+	
+	does_accept = die_roll < accept_probability;
+	// make sure that all the node make the same decision.
+	MPI_Bcast((void *)&does_accept, 1, MPI_BYTE, 0, get_comm());
+	
+	if(count < arg.num_forced_accept_step){
+		qlat::Printf("End Trajectory %d:\t FORCE ACCEPT.\n", count + 1);
+		gField_ext = gField;
+		does_accept = true;
+	}else{
+		if(does_accept){
+			qlat::Printf("End Trajectory %d:\t ACCEPT.\n", count + 1);
+			num_accept++;
+			gField_ext = gField;
+		}else{
+			qlat::Printf("End Trajectory %d:\t REJECT.\n", count + 1);
+			num_reject++;
+			gField = gField_ext;	
+		}	
+	}
+	
+	qlat::Printf("Old Hamiltonian =\t%+.12e\n", old_hamiltonian);
+	qlat::Printf("New Hamiltonian =\t%+.12e\n", new_hamiltonian);
+	qlat::Printf("Del Hamiltonian =\t%+.12e\n", del_hamiltonian); 
+	qlat::Printf("exp(-Delta H)   =\t%12.6f\n", accept_probability);
+	qlat::Printf("Die Roll        =\t%12.6f\n", die_roll); 	
+
+	fetch_expanded_chart(gField, chart);
+	average_plaquette = avg_plaquette(gField);
+	qlat::Printf("Avg Plaquette   =\t%+.12e\n", average_plaquette); 
+	qlat::Printf("ACCEPT RATE     =\t%+.4f\n", (double)num_accept / (num_accept + num_reject));	
+
+	if(arg.summary_dir_stem.size() > 0){
+		Fprintf(p_summary, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
+				count + 1, abs(del_hamiltonian), accept_probability, average_plaquette, does_accept, 
+				does_accept?new_energy_partition[1]:old_energy_partition[1]);
+		Fflush(p_summary);
+	}
+
+	if((count + 1) % arg.num_step_between_output == 0 && count + 1 >= arg.num_step_before_output){
+		Arg_export arg_export;
+		arg_export.beta = 			arg.beta;
+		arg_export.sequence_num = 	count + 1;
+		arg_export.ensemble_label = "double_multigrid";
+		
+		if(arg.export_dir_stem.size() > 0){
+			string address = arg.export_dir_stem + "ckpoint." + show(count + 1);
+			export_config_nersc(gField_ext, address, arg_export, true);
+		}
+		
+		sync_node();
+	}
+
+}
+
+inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg, 
+														const Arg_chmc &arg_coarse){
+	
+	// perform a number of fine updates and them a number of coarse updates.
+	
+	TIMER("double_multigrid");
+	
+	FILE *p = NULL;
+	if(arg.summary_dir_stem.size() > 0){
+		p = Fopen((arg.summary_dir_stem + "/summary.dat").c_str(), "a");
+	}
+
+	if(!get_id_node()) assert(p != NULL);
+
+	time_t now = time(NULL);
+	Fprintf(p, "# %s", ctime(&now));
+	Fprintf(p, "# %s\n", show(gField_ext.geo).c_str());
+	Fprintf(p, "# mag               = %i\n", arg.mag);
+	Fprintf(p, "# trajectory_length = %i\n", arg.trajectory_length);
+	Fprintf(p, "# num_trajectory    = %i\n", arg.num_trajectory);
+	Fprintf(p, "# beta              = %.6f\n", arg.beta);
+	Fprintf(p, "# dt                = %.5f\n", arg.dt);
+	Fprintf(p, "# c1                = %.5f\n", arg.gauge.c1);
+	Fprintf(p, "# GAUGE_TYPE        = %d\n", arg.gauge.type);
+	Fprintf(p, "# traj. number\texp(-DeltaH)\tavgPlaq\taccept/reject\n");
+	Fflush(p);
+	qlat::Printf("p opened.");
+
+	assert(arg.num_trajectory > 20);
+	RngState globalRngState("By the witness of the martyrs.");
+
+	Coordinate expansion(2, 2, 2, 2);
+
+	// declare fine lattice variables
+	Geometry geo_expanded = gField_ext.geo; geo_expanded.resize(expansion, expansion);
+	Geometry geo_local = gField_ext.geo;
+	Field<Matrix> gField; gField.init(geo_expanded); gField = gField_ext;
+	Field<Matrix> mField; mField.init(geo_local);
+
+	//declare coarse lattice variables
+	Coordinate total_size_coarse;
+	for(int i = 0; i < DIM; i++){
+		total_size_coarse[i] = geo_local.total_site()[i] / arg.mag;
+	}
+
+	Geometry geo_local_coarse; geo_local_coarse.init(total_size_coarse, DIM);
+	Geometry geo_expanded_coarse = geo_local_coarse; geo_expanded_coarse.resize(expansion, expansion);
+	Field<Matrix> gField_coarse; gField_coarse.init(geo_expanded_coarse);
+	Field<Matrix> mField_coarse; mField_coarse.init(geo_local_coarse);
+	
+	// initialize the coarse field.
+	sync_node();
+#pragma omp parallel for
+    for(long index = 0; index < geo_local_coarse.local_volume(); index++){
+		for(int mu = 0; mu < geo_local_coarse.multiplicity; mu++){
+			Coordinate xCoarse = geo_local_coarse.coordinate_from_index(index);
+			Coordinate x = arg.mag * xCoarse;
+			vector<int> cotta(arg.mag, mu);
+			get_path_ordered_product(gField_coarse.get_elems(xCoarse)[mu], gField, x, cotta);
+    }}
+    sync_node();
+    qlat::Printf("Coarse lattice initialized.\n");
+
+	fetch_expanded(gField_coarse);
+	fetch_expanded(gField);
+    qlat::Printf("CONSTRAINED Plaquette = %.12f\n", 
+										check_constrained_plaquette(gField, arg.mag));
+    qlat::Printf("COARSE      Plaquette = %.12f\n", avg_plaquette(gField_coarse));	
+
+	// declare the communication patterns
+	Chart<Matrix> chart;
+	produce_chart_envelope(chart, gField_ext.geo, arg.gauge);
+	Chart<Matrix> chart_coarse;
+	produce_chart_envelope(chart_coarse, gField_coarse.geo, arg_coarse.gauge);
+
+	// start the HMC 
+//	double old_hamiltonian;
+//	double new_hamiltonian;
+//	double die_roll;
+//	double del_hamiltonian;
+//	double accept_probability;
+//	double average_plaquette;
+//	
+//	vector<double> old_energy_partition;
+//	vector<double> new_energy_partition;
+//	bool does_accept;
+//	int num_accept = 0;
+//	int num_reject = 0;
+//
+//	double old_hamiltonian_coarse;
+//	double new_hamiltonian_coarse;
+//	double die_roll_coarse;
+//	double del_hamiltonian_coarse;
+//	double accept_probability_coarse;
+//	double average_plaquette_coarse;
+//	
+//	vector<double> old_energy_partition_coarse;
+//	vector<double> new_energy_partition_coarse;
+//	bool does_accept_coarse;
+//	int num_accept_coarse = 0;
+//	int num_reject_coarse = 0;
+//
+//	// first update the fine lattice
+//	for(int i = 0; i < arg.num_trajectory; i++){
+//		
+//		// start fine lattice update
+//
+//		init_momentum(mField);
+//		
+//		old_hamiltonian = get_hamiltonian(gField, mField, arg, chart, old_energy_partition);
+//		force_gradient_integrator(gField, mField, arg, chart);
+//		new_hamiltonian = get_hamiltonian(gField, mField, arg, chart, new_energy_partition);
+//	
+//		die_roll = u_rand_gen(globalRngState);
+//		del_hamiltonian = new_hamiltonian - old_hamiltonian;
+//		accept_probability = exp(old_hamiltonian - new_hamiltonian);
+//		
+//		does_accept = die_roll < accept_probability;
+//		// make sure that all the node make the same decision.
+//		MPI_Bcast((void *)&does_accept, 1, MPI_BYTE, 0, get_comm());
+//		
+//		if(i < arg.num_forced_accept_step){
+//			qlat::Printf("End Trajectory %d:\t FORCE ACCEPT.\n", i + 1);
+//			gField_ext = gField;
+//			does_accept = true;
+//		}else{
+//			if(does_accept){
+//				qlat::Printf("End Trajectory %d:\t ACCEPT.\n", i + 1);
+//				num_accept++;
+//				gField_ext = gField;
+//			}else{
+//				qlat::Printf("End Trajectory %d:\t REJECT.\n", i + 1);
+//				num_reject++;
+//				gField = gField_ext;	
+//			}	
+//		}
+//		
+//		qlat::Printf("Old Hamiltonian =\t%+.12e\n", old_hamiltonian);
+//		qlat::Printf("New Hamiltonian =\t%+.12e\n", new_hamiltonian);
+//		qlat::Printf("Delta H         =\t%+.12e\n", del_hamiltonian); 
+//		qlat::Printf("exp(-Delta H)   =\t%12.6f\n", accept_probability);
+//		qlat::Printf("Die Roll        =\t%12.6f\n", die_roll); 	
+//	
+//		fetch_expanded_chart(gField, chart);
+//		average_plaquette = avg_plaquette(gField);
+//		qlat::Printf("Avg Plaquette   =\t%+.12e\n", avgPlaq); 
+//		qlat::Printf("ACCEPT RATE     =\t%+.4f\n", (double)num_accept / (num_accept + num_reject));	
+//
+//		if(arg.summary_dir_stem.size() > 0){
+//			Fprintf(p, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
+//					i + 1, abs(deltaH), accept_probability, average_plaquette, does_accept, 
+//					does_accept?new_energy_partition_new[1]:old_energy_partition_old[1]);
+//			Fflush(p);
+//		}
+//
+//		if((i + 1) % arg.num_step_between_output == 0 && i + 1 >= arg.num_step_before_output){
+//			Arg_export arg_export;
+//			arg_export.beta = 			arg.beta;
+//			arg_export.sequence_num = 	i + 1;
+//			arg_export.ensemble_label = "double_multigrid";
+//			
+//			if(arg.export_dir_stem.size() > 0){
+//				string address = arg.export_dir_stem + "ckpoint." + show(i + 1);
+//				export_config_nersc(gFieldExt, address, arg_export, true);
+//			}
+//			
+//			sync_node();
+//		}
+	for(int i = 0; i < arg.num_trajectory; i++){
+		
+		// start fine lattice update
+
+		one_step(gField_ext, gField, mField, arg, chart, p, i, globalRngState);
+
+		// end fine lattice update
+		// start coarse lattice update
+		// end coarse lattice update
+
+	}
 
 	Timer::display();
 }

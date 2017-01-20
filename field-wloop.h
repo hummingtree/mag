@@ -150,9 +150,10 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 			qlat::Vector<Matrix> cx = copy.get_elems(x);
 			qlat::Vector<Matrix> ix = incr.get_elems(x);
 			for(int i = 0; i < DIM - 1; i++){
-				cx[i] = ix[i] * (coeff / 4.) + cx[i] * (1. - coeff);
+				cx[i] = ix[i] * (coeff / 6.) + cx[i] * (1. - coeff);
 // for Sommer scale purposes we don't need to unitarize the matrix.
-				cx[i].Unitarize();
+				su3_proj(cx[i], 10e-8);
+//				cx[i].Unitarize();
 		}}
 	}
 	

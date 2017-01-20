@@ -5,6 +5,8 @@
 #include <util/lattice.h>
 #include <util/vector.h>
 
+#include <alg/alg_smear.h>
+
 #include <qlat/config.h>
 #include <qlat/coordinate.h>
 #include <qlat/utils.h>
@@ -15,6 +17,8 @@
 #include <qlat/field-io.h>
 
 #include <timer.h>
+
+#define Matrix cps::Matrix
 
 using namespace cps;
 using namespace qlat;

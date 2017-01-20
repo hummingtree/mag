@@ -87,7 +87,7 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
                 int x[] = {x0, x1, x2, x3};
                 for(int mu = 0; mu < 4; mu++){
                 for(int nu = 0; nu < mu; nu++){
-			cps::Matrix mul; mul.UnitMatrix();
+						Matrix mul; mul.UnitMatrix();
                         for(int i = 0; i < mag; i++){
                                 mul = mul * *lat.GetLink(x, mu);
                                 x[mu]++;
@@ -96,7 +96,7 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
                                 mul = mul * *lat.GetLink(x, nu);
                                 x[nu]++;
                         }
-                        cps::Matrix dag;
+                        Matrix dag;
                         for(int i = 0; i < mag; i++){
                                 x[mu]--;
                                 dag.Dagger(*lat.GetLink(x, mu));
@@ -129,7 +129,7 @@ double check_constrained_plaquette(cps::Lattice &lat, int mag){
 
 template<class CharT, class Traits>
 std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os,
-                   const cps::Matrix &M){
+                   const Matrix &M){
         std::basic_ostringstream<CharT, Traits> os_;
         os_.flags(os.flags());
         os_.imbue(os.getloc());
