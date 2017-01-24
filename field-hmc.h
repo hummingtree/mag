@@ -459,11 +459,6 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 	sync_node();
 	TIMER("force_gradient_integrator()"); 
 
-	qlat::Printf(show(gField.geo).c_str());
-	qlat::Printf(show(mField.geo).c_str());
-	qlat::Printf(show(fField.geo).c_str());
-	qlat::Printf(show(gFieldAuxil.geo).c_str());
-
 	assert(is_matching_geo(gField.geo, mField.geo));
 	assert(is_matching_geo(gField.geo, fField.geo));
 	assert(is_matching_geo(gField.geo, gFieldAuxil.geo));
@@ -1122,11 +1117,12 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 		
 		// start fine lattice update
 
-		for(int r = 0; r < 4; r++){
+		for(int r = 0; r < 10; r++){
+			qlat::Printf("Trajectory %d - %d:\n", i + 1, r + 1);
 			update_field(gField_ext, gField, mField, gField_auxil, fField, rng_field, 
 						arg, chart, p, i, globalRngState);
 		}
-		
+		qlat::Printf("Trajectory %d - COARSE:\n", i + 1);
 		update_field(gField_ext_coarse, gField_coarse, mField_coarse, gField_auxil_coarse, 
 						fField_coarse, rng_field_coarse, arg_coarse, chart_coarse, 
 						p, i, globalRngState);
@@ -1137,7 +1133,7 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 		fetch_expanded_chart(gField_coarse, chart_coarse);
 		fetch_expanded_chart(gField, chart);
    		qlat::Printf("CONSTRAINED Plaquette = %.12f\n", check_constrained_plaquette(gField, arg.mag));
-    	qlat::Printf("COARSE      Plaquette = %.12f\n", avg_plaquette(gField_coarse));
+		qlat::Printf("COARSE      Plaquette = %.12f\n", avg_plaquette(gField_coarse));
 		// end fine lattice update
 		// start coarse lattice update
 		// end coarse lattice update
