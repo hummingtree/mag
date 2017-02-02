@@ -396,23 +396,7 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 // 2. check sum, i.e. literally the sum ...
 // 3. plaquette
 
-inline bool snatch_keyword(char* line, char* key, char* des){
-	if(strstr(line, key) != NULL){
-		// found the keyword and try to find the '='.
-		des = strchr(line, '=');
-		assert(des = NULL && strlen(des) > 0);
-		memmove(des, des+1, strlen(des)-1);
-		while((des[0] == ' ' || des[0] == '\t')){
-			assert(strlen(des) > 0);
-			memmove(des, des+1, strlen(des)-1);
-		}
-		return true;
-	}else{
-		return false;
-	}
-}
-
-inline bool snatch_keyword(char* line, char* key, char* des){
+inline bool snatch_keyword(char* line, const char* key, char* des){
     char* value;
 	if(strstr(line, key) != NULL){
     // found the keyword and try to find the '='.
@@ -422,7 +406,8 @@ inline bool snatch_keyword(char* line, char* key, char* des){
 	// remove the '=' and any space and tab
         value++;
 		while(value[0] == ' ' || value[0] == '\t') value++;
-		strcpy(des, value, strlen(value));
+		if(value[strlen(value)-1] == '\n') value[strlen(value)-1] = '\0';
+		strcpy(des, value);
         return true;
     }else{
         return false;
@@ -440,26 +425,48 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 	char desc[CSTRING_MAX];
 
 	Coordinate dim;
-	uint32_t checksum;
-	double plaquette;
+	uint32_t checksum = 0;
+	double plaquette = 0.;
 	char type[CSTRING_MAX];
 
 	int pos = -1;
 	rewind(input);
 	while(fgets(line, CSTRING_MAX, input) != NULL){
-		if(snatch_keyword(line, "DATATYPE", desc)) 		strcpy(type, desc);
-		if(snatch_keyword(line, "DIMENSION_1", desc)) 	dim[0] = atoi(desc);
-		if(snatch_keyword(line, "DIMENSION_2", desc)) 	dim[1] = atoi(desc);
-		if(snatch_keyword(line, "DIMENSION_3", desc)) 	dim[2] = atoi(desc);
-		if(snatch_keyword(line, "DIMENSION_4", desc)) 	dim[3] = atoi(desc);
-		if(snatch_keyword(line, "CHECKSUM", desc)) 		checksum = stoi(desc, 0, 16);
-		if(snatch_keyword(line, "PLAQUETTE", desc)) 	plaquette = strtod(desc, NULL);
-		
-		if(snatch_keyword(line, "END_HEADER", desc)){ 
+		if(snatch_keyword(line, "DATATYPE", desc)){
+			strcpy(type, desc);
+			qlat::Printf("DATATYPE = %s\n", type);
+		}
+		if(snatch_keyword(line, "DIMENSION_1", desc)){
+			dim[0] = atoi(desc);
+			qlat::Printf("DIMENSION_1 = %d\n", dim[0]);
+		}
+		if(snatch_keyword(line, "DIMENSION_2", desc)){
+			dim[1] = atoi(desc);
+			qlat::Printf("DIMENSION_2 = %d\n", dim[1]);
+		}
+		if(snatch_keyword(line, "DIMENSION_3", desc)){
+			dim[2] = atoi(desc);
+			qlat::Printf("DIMENSION_3 = %d\n", dim[2]);
+		}
+		if(snatch_keyword(line, "DIMENSION_4", desc)){
+			dim[3] = atoi(desc);
+			qlat::Printf("DIMENSION_4 = %d\n", dim[3]);
+		}
+
+		if(snatch_keyword(line, "CHECKSUM", desc)){
+			checksum = stoi(desc, 0, 16);
+			qlat::Printf("CHECKSUM = %x\n", checksum);
+		}
+		if(snatch_keyword(line, "PLAQUETTE", desc)){
+			plaquette = strtod(desc, NULL);
+			qlat::Printf("PLAQUETTE = %.8f\n", plaquette);
+		}
+		if(strstr(line, "END_HEADER") != NULL){ 
 			pos = ftell(input); 
 			break;
 		}
 	}
+
 	assert(pos > -1);
 	assert(!feof(input));
 
@@ -469,13 +476,13 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 	}else if(!strcmp(type, "4D_SU3_GAUGE_3x3")){
 		does_skip_third = false;
 	}else{
-		printf("WRONG DATATYPE!!!\n");
+		qlat::Printf("WRONG DATATYPE!!!\n");
 		assert(false);
 	}
 
 	if(dim == field.geo.total_site()){}
 	else{
-		printf("WRONG Lattice Size!!!\n");
+		qlat::Printf("WRONG Lattice Size!!!\n");
 		assert(false);
 	}
 
@@ -485,21 +492,41 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 		field_truncated.init(geo_);
 
 		sophisticated_serial_read(field_truncated, import, pos, num_of_reading_threads);
+		from_big_endian_64((char*)field_truncated.field.data(), 
+								sizeof(MatrixTruncatedSU3) * field_truncated.field.size());
+
+		uint32_t computed_checksum = fieldChecksumSum32(field_truncated);
+		if(computed_checksum != checksum){
+			qlat::Printf("WRONG Checksum: %x(labeled) vs %x(computed)\n", checksum, computed_checksum);
+			assert(false);
+		}
 
 		for(long index = 0; index < geo_.local_volume(); index++){
 			Coordinate x = geo_.coordinate_from_index(index);
-			Vector<MatrixTruncatedSU3> p_from = field_truncated.get_elems(x);
-			Vector<Matrix> p_to = field.get_elems(x);
-			for(int mu = 0; mu < DIM; mu++){
-				from_big_endian_64((char*)p_from.data(), p_from.data_size());
-				memcpy((void *)(p_to.data_size() + mu), (void *)(p_from.data_size() + mu), 
-									sizeof(MatrixTruncatedSU3));
+			qlat::Vector<MatrixTruncatedSU3> p_from = field_truncated.get_elems(x);
+			qlat::Vector<Matrix> p_to = field.get_elems(x);
+			for(int mu = 0; mu < geo_.multiplicity; mu++){
+				memcpy((char*)(p_to.data() + mu), (char*)(p_from.data() + mu), 
+							sizeof(MatrixTruncatedSU3));
 		}}
-		printf("maximum error = %f\n", reunitarize(field));
+	
+		reunitarize(field);
+
 	}else{
 		sophisticated_serial_read(field, import, pos, num_of_reading_threads);
-		from_big_endian_64((char*)field.field.data(), field.field.size());
+		from_big_endian_64((char*)field.field.data(), sizeof(Matrix) * field.field.size());
+	
+		uint32_t computed_checksum = fieldChecksumSum32(field);
+		if(computed_checksum != checksum){
+			qlat::Printf("WRONG Checksum: %x(labeled) vs %x(computed)\n", checksum, computed_checksum);
+			assert(false);
+		}
 	}
+
+	fetch_expanded(field);
+	double average_plaquette = avg_plaquette(field);
+	qlat::Printf("Plaquette: %.8f(labeled) vs %.8f(computed)\n", plaquette, average_plaquette);
+	if(abs(average_plaquette - plaquette) > 1e-4) assert(false);
 }
 
 
