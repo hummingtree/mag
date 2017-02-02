@@ -1,6 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
 
 #include <util/lattice.h>
 #include <util/vector.h>
@@ -19,6 +22,8 @@
 #include <timer.h>
 
 #define Matrix cps::Matrix
+
+#define CSTRING_MAX 500
 
 using namespace cps;
 using namespace qlat;
@@ -386,30 +391,114 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 
 }
 
-inline void import_config_nersc(Field<Matrix> &field, const string importAddr,
-                        		const int num_of_reading_threads = 0,
-					const bool doesSkipThird = false){
+// change the reading function such that it will check 
+// 1. dimension
+// 2. check sum, i.e. literally the sum ...
+// 3. plaquette
 
-	if(doesSkipThird){
+inline bool snatch_keyword(char* line, char* key, char* des){
+	if(strstr(line, key) != NULL){
+		// found the keyword and try to find the '='.
+		des = strchr(line, '=');
+		assert(des = NULL && strlen(des) > 0);
+		memmove(des, des+1, strlen(des)-1);
+		while((des[0] == ' ' || des[0] == '\t')){
+			assert(strlen(des) > 0);
+			memmove(des, des+1, strlen(des)-1);
+		}
+		return true;
+	}else{
+		return false;
+	}
+}
+
+inline bool snatch_keyword(char* line, char* key, char* des){
+    char* value;
+	if(strstr(line, key) != NULL){
+    // found the keyword and try to find the '='.
+		value = strchr(line, '=');
+		assert(value != NULL);
+
+	// remove the '=' and any space and tab
+        value++;
+		while(value[0] == ' ' || value[0] == '\t') value++;
+		strcpy(des, value, strlen(value));
+        return true;
+    }else{
+        return false;
+    }
+}
+
+inline void import_config_nersc(Field<Matrix> &field, const string import,
+                        		const int num_of_reading_threads = 0){
+	
+	FILE *input = fopen(import.c_str(), "rb");
+	assert(input != NULL);
+	assert(!ferror(input));
+
+	char line[CSTRING_MAX];
+	char desc[CSTRING_MAX];
+
+	Coordinate dim;
+	uint32_t checksum;
+	double plaquette;
+	char type[CSTRING_MAX];
+
+	int pos = -1;
+	rewind(input);
+	while(fgets(line, CSTRING_MAX, input) != NULL){
+		if(snatch_keyword(line, "DATATYPE", desc)) 		strcpy(type, desc);
+		if(snatch_keyword(line, "DIMENSION_1", desc)) 	dim[0] = atoi(desc);
+		if(snatch_keyword(line, "DIMENSION_2", desc)) 	dim[1] = atoi(desc);
+		if(snatch_keyword(line, "DIMENSION_3", desc)) 	dim[2] = atoi(desc);
+		if(snatch_keyword(line, "DIMENSION_4", desc)) 	dim[3] = atoi(desc);
+		if(snatch_keyword(line, "CHECKSUM", desc)) 		checksum = stoi(desc, 0, 16);
+		if(snatch_keyword(line, "PLAQUETTE", desc)) 	plaquette = strtod(desc, NULL);
+		
+		if(snatch_keyword(line, "END_HEADER", desc)){ 
+			pos = ftell(input); 
+			break;
+		}
+	}
+	assert(pos > -1);
+	assert(!feof(input));
+
+	bool does_skip_third;
+	if(!strcmp(type, "4D_SU3_GAUGE")){
+		does_skip_third = true;
+	}else if(!strcmp(type, "4D_SU3_GAUGE_3x3")){
+		does_skip_third = false;
+	}else{
+		printf("WRONG DATATYPE!!!\n");
+		assert(false);
+	}
+
+	if(dim == field.geo.total_site()){}
+	else{
+		printf("WRONG Lattice Size!!!\n");
+		assert(false);
+	}
+
+	if(does_skip_third){
 		Geometry geo_ = field.geo;
-		Field<MatrixTruncatedSU3> gf_qlat_trunc;
-		gf_qlat_trunc.init(geo_);
+		Field<MatrixTruncatedSU3> field_truncated;
+		field_truncated.init(geo_);
 
-		sophisticated_serial_read(gf_qlat_trunc, importAddr, 
-						num_of_reading_threads);
+		sophisticated_serial_read(field_truncated, import, pos, num_of_reading_threads);
 
 		for(long index = 0; index < geo_.local_volume(); index++){
 			Coordinate x = geo_.coordinate_from_index(index);
+			Vector<MatrixTruncatedSU3> p_from = field_truncated.get_elems(x);
+			Vector<Matrix> p_to = field.get_elems(x);
 			for(int mu = 0; mu < DIM; mu++){
-				memcpy((void *)(field.get_elems(x).data() + mu), 
-				(void *)(gf_qlat_trunc.get_elems_const(x).data() + mu), 
-				sizeof(MatrixTruncatedSU3));
-			}
-		}
-
-		reunitarize(field);
+				from_big_endian_64((char*)p_from.data(), p_from.data_size());
+				memcpy((void *)(p_to.data_size() + mu), (void *)(p_from.data_size() + mu), 
+									sizeof(MatrixTruncatedSU3));
+		}}
+		printf("maximum error = %f\n", reunitarize(field));
 	}else{
-		sophisticated_serial_read(field, importAddr, num_of_reading_threads);
+		sophisticated_serial_read(field, import, pos, num_of_reading_threads);
+		from_big_endian_64((char*)field.field.data(), field.field.size());
 	}
 }
 
