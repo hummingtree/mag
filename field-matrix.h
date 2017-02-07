@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include <cmath>
+
 #include <util/lattice.h>
 #include <util/vector.h>
 
@@ -31,6 +33,37 @@ using namespace std;
 
 // So in principle this file only uses the Matrix class and its member functions in cps.
 
+inline Matrix random_su3_from_su2(double small, RngState &rng){
+	
+	double a0 = u_rand_gen(rng, 1., small);
+	double a1 = u_rand_gen(rng, 1., -1.);
+	double a2 = u_rand_gen(rng, 1., -1.);
+	double a3 = u_rand_gen(rng, 1., -1.);
+
+//	qlat::Printf("Proposed: (%.3f, %.3f, %.3f, %.3f)\n", a0, a1, a2, a3);
+	double norm = sqrt((1 - a0 * a0) / (a1 * a1 + a2 * a2 + a3 * a3));
+
+	// a0 /= norm; 
+	a1 *= norm; a2 *= norm; a3 *= norm;
+
+//	qlat::Printf("Proposed: (%.3f, %.3f, %.3f, %.3f)\n", a0, a1, a2, a3);
+
+	Matrix m; m.UnitMatrix();
+
+	switch(rand_gen(rng) % 3){
+		case 0: m(1, 1) = qlat::Complex(a0, a3);  m(1, 2) = qlat::Complex(a2, a1);
+				m(2, 1) = qlat::Complex(-a2, a1); m(2, 2) = qlat::Complex(a0, -a3); break;
+		
+		case 1: m(0, 0) = qlat::Complex(a0, a3);  m(0, 2) = qlat::Complex(a2, a1);
+				m(2, 0) = qlat::Complex(-a2, a1); m(2, 2) = qlat::Complex(a0, -a3); break;
+		
+		case 2: m(0, 0) = qlat::Complex(a0, a3);  m(0, 1) = qlat::Complex(a2, a1);
+				m(1, 0) = qlat::Complex(-a2, a1); m(1, 1) = qlat::Complex(a0, -a3); break;
+	}
+	
+	return m;
+}
+
 inline double norm(const Matrix &m){
 	double sum = 0.;
 	for(int i = 0; i < 9; i++){
@@ -55,6 +88,7 @@ inline double reunitarize(Field<Matrix> &field){
 
 inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir){
+
 	Matrix mul; mul.UnitMatrix();
 	Matrix dag;
 	Coordinate y(x);
@@ -63,10 +97,19 @@ inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field,
 		direction = dir[i];
 		assert(direction < DIM * 2 && direction > -1);
 		if(direction < DIM){
+// For the purpose of running updating algorithms on qcdserver, communication is 
+// NOT needed if running on single node. Thus when crossing boundary to get the 
+// link variables we need to regularize the coordinates. 
+#ifdef USE_SINGLE_NODE
+			regularize(y, field.geo.node_site);	
+#endif
 			mul = mul * field.get_elems_const(y)[direction];
 			y[direction]++;
 		}else{
 			y[direction - DIM]--;
+#ifdef USE_SINGLE_NODE
+			regularize(y, field.geo.node_site);
+#endif
 			dag.Dagger(field.get_elems_const(y)[direction - DIM]);
 			mul = mul * dag;
 		}
@@ -454,7 +497,8 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 		}
 
 		if(snatch_keyword(line, "CHECKSUM", desc)){
-			checksum = stoi(desc, 0, 16);
+			puts(desc);
+			checksum = stol(desc, 0, 16);
 			qlat::Printf("CHECKSUM = %x\n", checksum);
 		}
 		if(snatch_keyword(line, "PLAQUETTE", desc)){
