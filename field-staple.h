@@ -36,7 +36,6 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
 
-				dir.resize(4);
 				dir[0] = nu; dir[1] = lambda; dir[2] = nu + DIM; dir[3] = lambda + DIM;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
@@ -45,7 +44,6 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir.resize(4);
 				dir[0] = nu; dir[1] = lambda + DIM; dir[2] = nu + DIM; dir[3] = lambda;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
@@ -54,7 +52,6 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir.resize(4);
 				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = nu; dir[3] = lambda + DIM;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
@@ -63,7 +60,6 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir.resize(4);
 				dir[0] = nu + DIM; dir[1] = lambda + DIM; dir[2] = nu; dir[3] = lambda;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
