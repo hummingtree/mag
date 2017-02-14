@@ -24,9 +24,9 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-inline map<int, vector<int> > init_chair_index(){
+inline map<int, vector<vector<int> > > init_chair_index(){
 	map<int, vector<vector<int> > > ret;
-	vector<int> dir(4);
+	vector<int> dir(4), dir_copy;
 	for(int mu = 0; mu < DIM; mu++){
 		vector<vector<int> > assign(0);
 		for(int nu = 0; nu < DIM; nu++){
@@ -35,33 +35,41 @@ inline map<int, vector<int> > init_chair_index(){
 				
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
-				
+
 				dir.resize(4);
 				dir[0] = nu; dir[1] = lambda; dir[2] = nu + DIM; dir[3] = lambda + DIM;
 				for(int i = 1; i < 4; i++){
-					dir.insert(i, mu);
-					assign.push_back(dir);
-				}
-				
-				dir.resize(4);
-				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = nu; dir[3] = lambda + DIM;
-				for(int i = 1; i < 4; i++){
-					dir.insert(i, mu);
-					assign.push_back(dir);
-				}
-				
-				dir.resize(4);
-				dir[0] = nu + DIM; dir[1] = lambdai + DIM; dir[2] = nu; dir[3] = lambda;
-				for(int i = 1; i < 4; i++){
-					dir.insert(i, mu);
-					assign.push_back(dir);
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
 				}
 				
 				dir.resize(4);
 				dir[0] = nu; dir[1] = lambda + DIM; dir[2] = nu + DIM; dir[3] = lambda;
 				for(int i = 1; i < 4; i++){
-					dir.insert(i, mu);
-					assign.push_back(dir);
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+				
+				dir.resize(4);
+				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = nu; dir[3] = lambda + DIM;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+				
+				dir.resize(4);
+				dir[0] = nu + DIM; dir[1] = lambda + DIM; dir[2] = nu; dir[3] = lambda;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
 				}
 			}
 		}
@@ -76,13 +84,19 @@ inline map<int, vector<int> > init_chair_index(){
 const static map<int, vector<vector<int> > > chair_index = init_chair_index();
 
 inline Matrix chair(const Field<Matrix> &f, const Coordinate &x){
-	return Matrix;
+	return Matrix();
 } 
 
 inline Matrix chair_staple_dagger(const Field<Matrix> &f, const Coordinate &x, int mu){
-	return Matrix;
+	vector<vector<int> >::const_iterator it = chair_index.at(mu).cbegin();
+	Matrix acc; acc.ZeroMatrix();
+	Matrix temp;
+	for(; it != chair_index.at(mu).cend(); it++){
+		get_path_ordered_product(temp, f, x, *it);
+		acc = acc + temp;
+	}
+	return acc;
 }
-
 
 
 
