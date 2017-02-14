@@ -32,6 +32,7 @@ inline map<int, vector<int> > init_chair_index(){
 		for(int nu = 0; nu < DIM; nu++){
 			if(mu == nu) continue;
 			for(int lambda = 0; lambda < DIM; lambda++){
+				
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
 				
