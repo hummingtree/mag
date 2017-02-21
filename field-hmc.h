@@ -803,8 +803,7 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 				derivative_field(dField, gField, arg, true);
 				Field<double> dField_output; dField_output.init(geo_coarse);
 				sophisticated_make_to_order(dField_output, dField);
-				sophisticated_serial_write(dField_output, 
-									arg.summary_dir_stem + "./dev_dump." + show(i + 1));
+				sophisticated_serial_write(dField_output, arg.summary_dir_stem + "./dev_dump." + show(i + 1));
 			}
 		}
 	}

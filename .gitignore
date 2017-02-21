@@ -4,3 +4,5 @@ logs/*
 *.sh
 data/*
 quench_test/*
+multigrid/*
+!quench_test/main.C
