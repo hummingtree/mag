@@ -730,6 +730,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	int numAccept = 0, numReject = 0;
 
 	for(int i = 0; i < arg.num_trajectory; i++){
+		
+		qlat::Printf("---------- START OF TRAJECTORY %5d --------\n", i+1);
+		
 		init_momentum(mField);
 		
 		oldH = get_hamiltonian(gField, mField, arg, chart, energy_partition_old);
@@ -764,7 +767,8 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 				gField = gFieldExt;	
 			}	
 		}
-		
+	
+		qlat::Printf("---------- END OF TRAJECTORY %5d ----------\n", i+1);
 		qlat::Printf("Old Hamiltonian =\t%+.12e\n", oldH);
 		qlat::Printf("New Hamiltonian =\t%+.12e\n", newH);
 		qlat::Printf("Delta H         =\t%+.12e\n", deltaH); 
@@ -800,7 +804,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 			sync_node();
 	
 			if(arg.summary_dir_stem.size() > 0){
-				derivative_field(dField, gField, arg, true);
+			// TODO: Test if doing pair would change the result.
+			//	derivative_field(dField, gField, arg, true);
+				derivative_field(dField, gField, arg, false);
 				Field<double> dField_output; dField_output.init(geo_coarse);
 				sophisticated_make_to_order(dField_output, dField);
 				sophisticated_serial_write(dField_output, arg.summary_dir_stem + "./dev_dump." + show(i + 1));
