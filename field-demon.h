@@ -16,6 +16,7 @@
 
 #include "field-matrix.h"
 #include "field-hmc.h"
+#include "field-staple.h"
 
 using namespace cps;
 using namespace qlat;
@@ -36,13 +37,13 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 
 	FILE *p = NULL;
 	if(arg.summary_dir_stem.size() > 0){
-		p = Fopen((arg.summary_dir_stem + "/demon.dat").c_str(), "a");
+		p = Fopen((arg.summary_dir_stem + "/demon_equil.dat").c_str(), "a");
 	}
 	
 	// TODO: now only for plaquette and rectangular;
-	vector<double> E(2); E[0] = 0.; E[1] = 0.;
-	vector<double> S(2);
-	vector<double> S0(2);
+	vector<double> E(4, 0.);
+	vector<double> S(4);
+	vector<double> S0(4);
 	
 	Coordinate expansion(2, 2, 2, 2);
 	Geometry geo = gField_ext.geo; geo.resize(expansion, expansion);
@@ -57,8 +58,8 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 	long reject = 0;
 
 	Matrix m, c;
-	Matrix P, R;
-	vector<double> delta_S(2);
+	Matrix P, R, C, T;
+	vector<double> delta_S(4);
 
 	for(int i = 0; i < arg.num_trajectory; i++){
 		for(long index = 0; index < geo.local_volume(); index++){
@@ -67,28 +68,38 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 			for(int mu = 0; mu < geo.multiplicity; mu++){	
 				get_staple_dagger(P, gField1, x, mu);	
 				get_rectangular_dagger(R, gField1, x, mu);
+				C = chair_staple_dagger(gField1, x, mu);
+				T = twist_staple_dagger(gField1, x, mu);
 				for(int n = 0; n < num_hits; n++){
 					m = random_su3_from_su2(0.9, global_rng_state);
 					delta_S[0] = -(m * v[mu] * P).ReTr() + (v[mu] * P).ReTr();
 					delta_S[1] = -(m * v[mu] * R).ReTr() + (v[mu] * R).ReTr();
+					delta_S[2] = -(m * v[mu] * C).ReTr() + (v[mu] * C).ReTr();
+					delta_S[3] = -(m * v[mu] * T).ReTr() + (v[mu] * T).ReTr();
 					// printf("%.8f;\t %.8f;\n", delta_S[0], delta_S[1]);
 					if(E[0] - delta_S[0] > -E_max && E[0] - delta_S[0] < E_max &&
-							E[1] - delta_S[1] > -E_max && E[1] - delta_S[1] < E_max){
+							E[1] - delta_S[1] > -E_max && E[1] - delta_S[1] < E_max &&
+							E[2] - delta_S[2] > -E_max && E[2] - delta_S[2] < E_max &&
+							E[3] - delta_S[3] > -E_max && E[3] - delta_S[3] < E_max){
 						v[mu] = m * v[mu];
 						E[0] -= delta_S[0];
 						E[1] -= delta_S[1];
+						E[2] -= delta_S[2];
+						E[3] -= delta_S[3];
 						accept++;
 					}else{
 						reject++;
 					}
 				}
 				
-				if(i >= arg.num_step_before_output && i % arg.num_step_between_output == 0 && !get_id_node()){
-					fwrite((char*)E.data(), 1, sizeof(double) * E.size(), p);
-					fflush(p);
-				}
+
 		}}
-	
+
+		if(i >= arg.num_step_before_output && i % arg.num_step_between_output == 0 && !get_id_node()){
+			fwrite((char*)E.data(), 1, sizeof(double) * E.size(), p);
+			fflush(p);
+		}
+
 //		fetch_expanded(gField1);
 //		S[0] = -total_plaq(gField1);
 //		S[1] = -total_rectangular(gField1);
@@ -101,6 +112,8 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 	
 		qlat::Printf("E[0] = %.8f.\n", E[0]);
 		qlat::Printf("E[1] = %.8f.\n", E[1]);
+		qlat::Printf("E[2] = %.8f.\n", E[2]);
+		qlat::Printf("E[3] = %.8f.\n", E[3]);
 		qlat::Printf("accept = %d\n", accept);
 		qlat::Printf("reject = %d\n", reject);
 		qlat::Printf("unitarize   = %.8e\n", reunitarize(gField1));

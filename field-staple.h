@@ -36,6 +36,61 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
 
+				dir[0] = nu; dir[1] = lambda; dir[2] = lambda + DIM; dir[3] = nu + DIM;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+				
+				dir[0] = nu; dir[1] = lambda + DIM; dir[2] = lambda + DIM; dir[3] = nu;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+				
+				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = lambda; dir[3] = nu + DIM;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+				
+				dir[0] = nu + DIM; dir[1] = lambda + DIM; dir[2] = lambda; dir[3] = nu;
+				for(int i = 1; i < 4; i++){
+					dir_copy = dir;
+					vector<int>::iterator it = dir_copy.begin(); 
+					dir_copy.insert(it + i, mu);
+					assign.push_back(dir_copy);
+				}
+			}
+		}
+ 
+		ret[mu] = assign;
+	}
+
+	return ret;
+
+}
+
+const static map<int, vector<vector<int> > > chair_index = init_chair_index();
+
+inline map<int, vector<vector<int> > > init_twist_index(){
+	map<int, vector<vector<int> > > ret;
+	vector<int> dir(4), dir_copy;
+	for(int mu = 0; mu < DIM; mu++){
+		vector<vector<int> > assign(0);
+		for(int nu = 0; nu < DIM; nu++){
+			if(mu == nu) continue;
+			for(int lambda = 0; lambda < DIM; lambda++){
+				
+				if(lambda == nu) continue;
+				if(lambda == mu) continue;
+
 				dir[0] = nu; dir[1] = lambda; dir[2] = nu + DIM; dir[3] = lambda + DIM;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
@@ -77,7 +132,7 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 
 }
 
-const static map<int, vector<vector<int> > > chair_index = init_chair_index();
+const static map<int, vector<vector<int> > > twist_index = init_twist_index();
 
 inline Matrix chair(const Field<Matrix> &f, const Coordinate &x){
 	return Matrix();
@@ -94,5 +149,18 @@ inline Matrix chair_staple_dagger(const Field<Matrix> &f, const Coordinate &x, i
 	return acc;
 }
 
+inline Matrix twist(const Field<Matrix> &f, const Coordinate &x){
+	return Matrix();
+} 
 
+inline Matrix twist_staple_dagger(const Field<Matrix> &f, const Coordinate &x, int mu){
+	vector<vector<int> >::const_iterator it = twist_index.at(mu).cbegin();
+	Matrix acc; acc.ZeroMatrix();
+	Matrix temp;
+	for(; it != twist_index.at(mu).cend(); it++){
+		get_path_ordered_product(temp, f, x, *it);
+		acc = acc + temp;
+	}
+	return acc;
+}
 
