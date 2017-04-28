@@ -31,6 +31,8 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
+QLAT_START_NAMESPACE
+
 // So in principle this file only uses the Matrix class and its member functions in cps.
 
 inline Matrix random_su3_from_su2(double small, RngState &rng){
@@ -81,7 +83,7 @@ inline double reunitarize(Field<Matrix> &field){
 			Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
 			newElem.Unitarize();
-			maxDev = max(maxDev, norm(newElem - oldElem));
+			maxDev = max(maxDev, qlat::norm(newElem - oldElem));
 	}}
 	return maxDev;
 }
@@ -573,4 +575,4 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 	if(abs(average_plaquette - plaquette) > 1e-4) assert(false);
 }
 
-
+QLAT_END_NAMESPACE

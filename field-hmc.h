@@ -15,12 +15,15 @@
 #include <timer.h>
 
 #include "field-matrix.h"
+#include <cmath>
 
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
 #define SU3_NUM_OF_GENERATORS 8
+
+QLAT_START_NAMESPACE
 
 static const double inv_sqrt2 = 1. / sqrt(2.);
 
@@ -744,7 +747,7 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 		dieRoll = u_rand_gen(globalRngState);
 		deltaH = newH - oldH;
 		percentDeltaH = deltaH / oldH;
-		acceptProbability = exp(oldH - newH);
+		acceptProbability = std::exp(oldH - newH);
 		doesAccept = (dieRoll < acceptProbability);
 		MPI_Bcast((void *)&doesAccept, 1, MPI_BYTE, 0, get_comm());
 		// make sure that all the node make the same decision.
@@ -855,7 +858,7 @@ inline void update_field(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field
 
 	die_roll = u_rand_gen(globalRngState);
 	del_hamiltonian = new_hamiltonian - old_hamiltonian;
-	accept_probability = exp(old_hamiltonian - new_hamiltonian);
+	accept_probability = std::exp(old_hamiltonian - new_hamiltonian);
 	
 	does_accept = die_roll < accept_probability;
 	// make sure that all the node make the same decision.
@@ -1148,3 +1151,4 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 	Timer::display();
 }
 
+QLAT_END_NAMESPACE
