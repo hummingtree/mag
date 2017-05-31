@@ -23,17 +23,17 @@
 
 #include <timer.h>
 
-#define Matrix cps::Matrix
-
 #define CSTRING_MAX 500
 
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
+QLAT_START_NAMESPACE
+
 // So in principle this file only uses the Matrix class and its member functions in cps.
 
-inline Matrix random_su3_from_su2(double small, RngState &rng){
+inline cps::Matrix random_su3_from_su2(double small, RngState &rng){
 	
 	double a0 = u_rand_gen(rng, 1., small);
 	double a1 = u_rand_gen(rng, 1., -1.);
@@ -48,7 +48,7 @@ inline Matrix random_su3_from_su2(double small, RngState &rng){
 
 //	qlat::Printf("Proposed: (%.3f, %.3f, %.3f, %.3f)\n", a0, a1, a2, a3);
 
-	Matrix m; m.UnitMatrix();
+	cps::Matrix m; m.UnitMatrix();
 
 	switch(rand_gen(rng) % 3){
 		case 0: m(1, 1) = qlat::Complex(a0, a3);  m(1, 2) = qlat::Complex(a2, a1);
@@ -64,7 +64,7 @@ inline Matrix random_su3_from_su2(double small, RngState &rng){
 	return m;
 }
 
-inline double norm(const Matrix &m){
+inline double norm(const cps::Matrix &m){
 	double sum = 0.;
 	for(int i = 0; i < 9; i++){
 		sum += norm(m[i]); // squared norm
@@ -72,25 +72,25 @@ inline double norm(const Matrix &m){
 	return sqrt(sum);
 }
 
-inline double reunitarize(Field<Matrix> &field){
+inline double reunitarize(Field<cps::Matrix> &field){
 	double maxDev = 0.;
-	Matrix oldElem;
+	cps::Matrix oldElem;
         for(long index = 0; index < field.geo.local_volume(); index++){
                 Coordinate x = field.geo.coordinate_from_index(index);
                 for(int mu = 0; mu < field.geo.multiplicity; mu++){
-			Matrix &newElem = field.get_elems(x)[mu];
+			cps::Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
 			newElem.Unitarize();
-			maxDev = max(maxDev, norm(newElem - oldElem));
+			maxDev = max(maxDev, qlat::norm(newElem - oldElem));
 	}}
 	return maxDev;
 }
 
-inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field, 
+inline void get_path_ordered_product(cps::Matrix &prod, const Field<cps::Matrix> &field, 
 					const Coordinate &x, const vector<int> &dir){
 
-	Matrix mul; mul.UnitMatrix();
-	Matrix dag;
+	cps::Matrix mul; mul.UnitMatrix();
+	cps::Matrix dag;
 	Coordinate y(x);
 	int direction;
 	for(unsigned int i = 0; i < dir.size(); i++){
@@ -117,17 +117,17 @@ inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field,
 	prod = mul;
 }
 
-inline double get_plaq(const Field<Matrix> &f, const Coordinate &x){
+inline double get_plaq(const Field<cps::Matrix> &f, const Coordinate &x){
 	// assuming properly communicated.
 	
-	const qlat::Vector<Matrix> gx = f.get_elems_const(x);
-	vector<qlat::Vector<Matrix> > gxex(DIMN);
+	const qlat::Vector<cps::Matrix> gx = f.get_elems_const(x);
+	vector<qlat::Vector<cps::Matrix> > gxex(DIMN);
 	Coordinate y;
 	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu]++;
 		gxex[mu] = f.get_elems_const(y);
 	}
-	Matrix m, n;
+	cps::Matrix m, n;
 	double ret = 0.;
 	for(int mu = 0; mu < DIMN; mu++){
 	for(int nu = 0; nu < mu; nu++){
@@ -142,14 +142,21 @@ inline int symmetric_index_mapping(int mu, int nu){
 	return DIMN * nu + mu - (nu + 1) * (nu + 2) / 2;
 }
 
-inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
+inline double get_rectangular(const Field<cps::Matrix> &f, const Coordinate &x){
 	// assuming properly communicated.
 
 	TIMER("get_rectangular()");
+<<<<<<< HEAD
 	const qlat::Vector<Matrix> gx_0_0 = f.get_elems_const(x);
 	vector<qlat::Vector<Matrix> > gx_1_0(DIMN);
 	vector<qlat::Vector<Matrix> > gx_2_0(DIMN);
 	vector<qlat::Vector<Matrix> > gx_1_1(6);
+=======
+	const qlat::Vector<cps::Matrix> gx_0_0 = f.get_elems_const(x);
+	vector<qlat::Vector<cps::Matrix> > gx_1_0(DIM);
+	vector<qlat::Vector<cps::Matrix> > gx_2_0(DIM);
+	vector<qlat::Vector<cps::Matrix> > gx_1_1(6);
+>>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
 
 	Coordinate y;
 	for(int mu = 0; mu < DIMN; mu++){
@@ -176,8 +183,13 @@ inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
 	// nu 2     x 5
 	//    3       x
 	double sum = 0.;
+<<<<<<< HEAD
 	Matrix m;
 	for(int mu = 0; mu < DIMN; mu++){
+=======
+	cps::Matrix m;
+	for(int mu = 0; mu < DIM; mu++){
+>>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
 	for(int nu = 0; nu < mu; nu++){
 		int symmetric_index = symmetric_index_mapping(mu, nu);
 		
@@ -191,7 +203,7 @@ inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
 	return sum;
 }
 
-inline double total_plaq(const qlat::Field<Matrix> &f){
+inline double total_plaq(const qlat::Field<cps::Matrix> &f){
 	// assuming properly communicated.
 	TIMER("total_plaq()");
 	double local_sum = 0.;
@@ -224,7 +236,7 @@ inline double total_plaq(const qlat::Field<Matrix> &f){
 	return global_sum;
 }
 
-inline double total_rectangular(const qlat::Field<Matrix> &f){
+inline double total_rectangular(const qlat::Field<cps::Matrix> &f){
 	// assuming properly communicated.
 	TIMER("total_rectangular()");
 	double local_sum = 0.;
@@ -257,11 +269,11 @@ inline double total_rectangular(const qlat::Field<Matrix> &f){
 	return global_sum;
 }
 
-inline double avg_plaquette(const qlat::Field<Matrix> &f){
+inline double avg_plaquette(const qlat::Field<cps::Matrix> &f){
 	return total_plaq(f) / (18. * get_num_node() * f.geo.local_volume());
 }
 
-inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
+inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 	qlat::Geometry geo_ = gauge_field_qlat.geo;
 	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.local_volume(); index++){
@@ -277,7 +289,7 @@ inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	return tr_global_sum / (12. * get_num_node() * geo_.local_volume());
 }
 
-inline double check_constrained_plaquette(const qlat::Field<Matrix> &gField, int mag){
+inline double check_constrained_plaquette(const qlat::Field<cps::Matrix> &gField, int mag){
 	std::vector<Coordinate> dir_vec(4);
 	dir_vec[0] = Coordinate(1, 0, 0, 0);
 	dir_vec[1] = Coordinate(0, 1, 0, 0);
@@ -295,7 +307,7 @@ inline double check_constrained_plaquette(const qlat::Field<Matrix> &gField, int
 		Coordinate x(x0, x1, x2, x3);
 		for(int mu = 0; mu < DIMN; mu++){
 		for(int nu = 0; nu < mu; nu++){
-			Matrix m;
+			cps::Matrix m;
 			vector<int> dir; dir.clear();
 			for(int i = 0; i < mag; i++) dir.push_back(mu);
 			for(int i = 0; i < mag; i++) dir.push_back(nu);
@@ -322,7 +334,7 @@ public:
 	string ensemble_label;
 };
 
-inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
+inline void export_config_nersc(const Field<cps::Matrix> &field, const string &dir,
 					const Arg_export &arg, const bool doesSkipThird = false){
 	FILE *pExport;
 
@@ -331,7 +343,7 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 	Coordinate expansion(1, 1, 1, 1);
 	geo_expand_one.resize(expansion, expansion);
 
-	Field<Matrix> field_cp; field_cp.init(geo_expand_one);
+	Field<cps::Matrix> field_cp; field_cp.init(geo_expand_one);
 	field_cp = field;
 
 	fetch_expanded(field_cp);
@@ -386,7 +398,7 @@ inline void export_config_nersc(const Field<Matrix> &field, const string &dir,
 	sophisticated_serial_write(field_write, dir, true);
 
 	}else{
-		Field<Matrix> field_write;
+		Field<cps::Matrix> field_write;
 		sophisticated_make_to_order(field_write, field_cp);
 		string crc32Hash = field_hash_crc32(field_write); 
 
@@ -457,7 +469,7 @@ inline bool snatch_keyword(char* line, const char* key, char* des){
     }
 }
 
-inline void import_config_nersc(Field<Matrix> &field, const string import,
+inline void import_config_nersc(Field<cps::Matrix> &field, const string import,
                         		const int num_of_reading_threads = 0){
 	
 	FILE *input = fopen(import.c_str(), "rb");
@@ -548,7 +560,7 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 		for(long index = 0; index < geo_.local_volume(); index++){
 			Coordinate x = geo_.coordinate_from_index(index);
 			qlat::Vector<MatrixTruncatedSU3> p_from = field_truncated.get_elems(x);
-			qlat::Vector<Matrix> p_to = field.get_elems(x);
+			qlat::Vector<cps::Matrix> p_to = field.get_elems(x);
 			for(int mu = 0; mu < geo_.multiplicity; mu++){
 				memcpy((char*)(p_to.data() + mu), (char*)(p_from.data() + mu), 
 							sizeof(MatrixTruncatedSU3));
@@ -558,7 +570,7 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 
 	}else{
 		sophisticated_serial_read(field, import, pos, num_of_reading_threads);
-		from_big_endian_64((char*)field.field.data(), sizeof(Matrix) * field.field.size());
+		from_big_endian_64((char*)field.field.data(), sizeof(cps::Matrix) * field.field.size());
 	
 		uint32_t computed_checksum = fieldChecksumSum32(field);
 		if(computed_checksum != checksum){
@@ -573,4 +585,4 @@ inline void import_config_nersc(Field<Matrix> &field, const string import,
 	if(abs(average_plaquette - plaquette) > 1e-4) assert(false);
 }
 
-
+QLAT_END_NAMESPACE

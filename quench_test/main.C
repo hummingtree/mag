@@ -118,7 +118,7 @@ void hmc_in_qlat(const Coordinate &totalSize, string config_addr, const Arg_chmc
 
 //  start hmc 
 	FILE *pFile = Fopen(
-			str_printf("./summary/8c8_iwasaki_b8.8188_c1_0.07151_16c16_iwasaki_b3.40_c1_-0.331.dat").c_str(), "a");
+			str_printf("./summary/16c32_iwasaki_b8.8188_c1_0.07151_32c64_iwasaki_b3.40_c1_-0.331.dat").c_str(), "a");
 	
 	time_t now = time(NULL);
 	Fprintf(pFile, "# %s", ctime(&now));
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]){
 	cout.setf(ios::showpos);
 	cout.setf(ios::scientific);
 
-	Coordinate total_size(8, 8, 8, 8);
+	Coordinate total_size(16, 16, 16, 32);
 	int mag = 2;
 	
 	int origin_start = 		1000;
@@ -172,7 +172,7 @@ int main(int argc, char* argv[]){
 
 	for(int i = origin_start; i <= origin_end; i += origin_interval){
 		arg.mag = mag;
-		arg.trajectory_length = 9;
+		arg.trajectory_length = 12;
 		arg.num_trajectory = 10000;
 		arg.beta = 3.40;
 		arg.dt = 1. / arg.trajectory_length;
@@ -197,11 +197,11 @@ int main(int argc, char* argv[]){
 		arg_original.gauge.c1 = 0.07151;
 
 //		cps_config = 			str_printf("/bgusr/home/jtu/quench_evolution/configurations/quench_iwasaki_4c4_b2.60_c1_-0.331/ckpoint.%d", i);
-		cps_config = 			str_printf("/bgusr/home/jtu/quench_evolution/configurations/quench_iwasaki_8c8_b8.8188_c1_0.07151/ckpoint.%d", i);
+		cps_config = 			str_printf("/bgusr/home/jtu/quench_evolution/configurations/quench_iwasaki_16c32_b8.8188_c1_0.07151/ckpoint.%d", i);
 
 // 		expanded_config = 		str_printf("./configurations/quench_wilson_4c4_b6.05_ckpoint.%d_mag%d_b%.2f_wilson/", i, mag, arg.beta);
 		expanded_config = "";
-		arg.summary_dir_stem = 	str_printf("./results/8c8_iwasaki_b8.8188_c1_0.07151_16c16_iwasaki_b3.40_c1_-0.331_config_%d/", i);
+		arg.summary_dir_stem = 	str_printf("./results/16c32_iwasaki_b8.8188_c1_0.07151_32c64_iwasaki_b3.40_c1_-0.331_config_%d/", i);
 //		arg.summary_dir_stem = "";
 
 		mkdir(expanded_config.c_str(), 0777);	
