@@ -24,29 +24,29 @@ using namespace qlat;
 using namespace std;
 
 inline double wilson_loop(const Field<Matrix> &f, const Coordinate &x, 
-									const array<int, DIM - 1> &r, int T){
+									const array<int, DIMN - 1> &r, int T){
 	
 	assert(T > 0);
-	for(int i = 0; i < DIM - 1; i++) assert(r[i] >= 0);
+	for(int i = 0; i < DIMN - 1; i++) assert(r[i] >= 0);
 
 	vector<int> dir; dir.clear();
 
-	for(int i = 0; i < DIM - 1; i++){
+	for(int i = 0; i < DIMN - 1; i++){
 	for(int j = 0; j < r[i]; j++){
 		dir.push_back(i);
 	}}
 	
 	for(int i = 0; i < T; i++){
-		dir.push_back(DIM - 1);
+		dir.push_back(DIMN - 1);
 	}
 	
-	for(int i = DIM - 2; i >= 0; i--){
+	for(int i = DIMN - 2; i >= 0; i--){
 	for(int j = 0; j < r[i]; j++){
-		dir.push_back(i + DIM);
+		dir.push_back(i + DIMN);
 	}}
 	
 	for(int i = 0; i < T; i++){
-		dir.push_back(DIM - 1 + DIM);
+		dir.push_back(DIMN - 1 + DIMN);
 	}
 
 	Matrix m;
@@ -56,15 +56,15 @@ inline double wilson_loop(const Field<Matrix> &f, const Coordinate &x,
 }
 
 inline double avg_wilson_loop(const Field<Matrix> &f, 
-										const array<int, DIM - 1> &r, int T){
+										const array<int, DIMN - 1> &r, int T){
 	TIMER("avg_wilson_loop()");
 	double local_sum = 0.;
 	int num_threads;
 	vector<double> pp_local_sum; // container to store sum from different threads
 
 	// produce permutations of the spatial vector r
-	array<int, DIM - 1> r_local = r; sort(r_local.begin(), r_local.end());
-	vector<array<int, DIM - 1> > perm; perm.clear();
+	array<int, DIMN - 1> r_local = r; sort(r_local.begin(), r_local.end());
+	vector<array<int, DIMN - 1> > perm; perm.clear();
 
 	do{
 		perm.push_back(r_local);
@@ -81,7 +81,7 @@ inline double avg_wilson_loop(const Field<Matrix> &f,
 #pragma omp for
 		for(long index = 0; index < f.geo.local_volume(); index++){
 			Coordinate x = f.geo.coordinate_from_index(index);
-			vector<array<int, DIM - 1> >::iterator it;
+			vector<array<int, DIMN - 1> >::iterator it;
 			for(it = perm.begin(); it != perm.end(); it++){
 				p_local_sum += wilson_loop(f, x, *it, T);
 			}
@@ -103,14 +103,14 @@ inline void get_staple_spatial(Matrix &staple, const Field<Matrix> &field,
 	vector<int> dir;
 	Matrix staple_; staple_.ZeroMatrix();
 	Matrix m;
-	for(int j = 0; j < DIM - 1; j++){
+	for(int j = 0; j < DIMN - 1; j++){
 		if(i == j) continue;
 		dir.clear();
-		dir.push_back(j); dir.push_back(i); dir.push_back(j + DIM);
+		dir.push_back(j); dir.push_back(i); dir.push_back(j + DIMN);
 		get_path_ordered_product(m, field, x, dir);
 		staple_ += m;
 		dir.clear();
-		dir.push_back(j + DIM); dir.push_back(i); dir.push_back(j);
+		dir.push_back(j + DIMN); dir.push_back(i); dir.push_back(j);
 		get_path_ordered_product(m, field, x, dir);
 		staple_ += m;
 	}
@@ -124,8 +124,8 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 	Coordinate expansion(1, 1, 1, 1);
 	geo1.resize(expansion, expansion);
 
-	Field<Matrix> copy; copy.init(geo1, DIM);
-	Field<Matrix> incr; incr.init(geo1, DIM);
+	Field<Matrix> copy; copy.init(geo1, DIMN);
+	Field<Matrix> incr; incr.init(geo1, DIMN);
 	copy = f;
 	
 	Chart<Matrix> chart;
@@ -139,7 +139,7 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 			Coordinate x = copy.geo.coordinate_from_index(index);
 			qlat::Vector<Matrix> ix = incr.get_elems(x);
 			Matrix m;
-			for(int i = 0; i < DIM - 1; i++){
+			for(int i = 0; i < DIMN - 1; i++){
 				get_staple_spatial(m, copy, x, i);
 				ix[i] = m;
 		}}
@@ -149,7 +149,7 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 			Coordinate x = copy.geo.coordinate_from_index(index);
 			qlat::Vector<Matrix> cx = copy.get_elems(x);
 			qlat::Vector<Matrix> ix = incr.get_elems(x);
-			for(int i = 0; i < DIM - 1; i++){
+			for(int i = 0; i < DIMN - 1; i++){
 				cx[i] = ix[i] * (coeff / 6.) + cx[i] * (1. - coeff);
 // for Sommer scale purposes we don't need to unitarize the matrix.
 				su3_proj(cx[i], 10e-8);

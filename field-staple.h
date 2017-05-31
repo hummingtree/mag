@@ -27,16 +27,16 @@ using namespace std;
 inline map<int, vector<vector<int> > > init_chair_index(){
 	map<int, vector<vector<int> > > ret;
 	vector<int> dir(4), dir_copy;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 		vector<vector<int> > assign(0);
-		for(int nu = 0; nu < DIM; nu++){
+		for(int nu = 0; nu < DIMN; nu++){
 			if(mu == nu) continue;
-			for(int lambda = 0; lambda < DIM; lambda++){
+			for(int lambda = 0; lambda < DIMN; lambda++){
 				
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
 
-				dir[0] = nu; dir[1] = lambda; dir[2] = lambda + DIM; dir[3] = nu + DIM;
+				dir[0] = nu; dir[1] = lambda; dir[2] = lambda + DIMN; dir[3] = nu + DIMN;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -44,7 +44,7 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu; dir[1] = lambda + DIM; dir[2] = lambda + DIM; dir[3] = nu;
+				dir[0] = nu; dir[1] = lambda + DIMN; dir[2] = lambda + DIMN; dir[3] = nu;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -52,7 +52,7 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = lambda; dir[3] = nu + DIM;
+				dir[0] = nu + DIMN; dir[1] = lambda; dir[2] = lambda; dir[3] = nu + DIMN;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -60,7 +60,7 @@ inline map<int, vector<vector<int> > > init_chair_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu + DIM; dir[1] = lambda + DIM; dir[2] = lambda; dir[3] = nu;
+				dir[0] = nu + DIMN; dir[1] = lambda + DIMN; dir[2] = lambda; dir[3] = nu;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -82,16 +82,16 @@ const static map<int, vector<vector<int> > > chair_index = init_chair_index();
 inline map<int, vector<vector<int> > > init_twist_index(){
 	map<int, vector<vector<int> > > ret;
 	vector<int> dir(4), dir_copy;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 		vector<vector<int> > assign(0);
-		for(int nu = 0; nu < DIM; nu++){
+		for(int nu = 0; nu < DIMN; nu++){
 			if(mu == nu) continue;
-			for(int lambda = 0; lambda < DIM; lambda++){
+			for(int lambda = 0; lambda < DIMN; lambda++){
 				
 				if(lambda == nu) continue;
 				if(lambda == mu) continue;
 
-				dir[0] = nu; dir[1] = lambda; dir[2] = nu + DIM; dir[3] = lambda + DIM;
+				dir[0] = nu; dir[1] = lambda; dir[2] = nu + DIMN; dir[3] = lambda + DIMN;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -99,7 +99,7 @@ inline map<int, vector<vector<int> > > init_twist_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu; dir[1] = lambda + DIM; dir[2] = nu + DIM; dir[3] = lambda;
+				dir[0] = nu; dir[1] = lambda + DIMN; dir[2] = nu + DIMN; dir[3] = lambda;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -107,7 +107,7 @@ inline map<int, vector<vector<int> > > init_twist_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu + DIM; dir[1] = lambda; dir[2] = nu; dir[3] = lambda + DIM;
+				dir[0] = nu + DIMN; dir[1] = lambda; dir[2] = nu; dir[3] = lambda + DIMN;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 
@@ -115,7 +115,7 @@ inline map<int, vector<vector<int> > > init_twist_index(){
 					assign.push_back(dir_copy);
 				}
 				
-				dir[0] = nu + DIM; dir[1] = lambda + DIM; dir[2] = nu; dir[3] = lambda;
+				dir[0] = nu + DIMN; dir[1] = lambda + DIMN; dir[2] = nu; dir[3] = lambda;
 				for(int i = 1; i < 4; i++){
 					dir_copy = dir;
 					vector<int>::iterator it = dir_copy.begin(); 

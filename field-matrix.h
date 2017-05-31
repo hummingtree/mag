@@ -41,7 +41,7 @@ inline Matrix random_su3_from_su2(double small, RngState &rng){
 	double a3 = u_rand_gen(rng, 1., -1.);
 
 //	qlat::Printf("Proposed: (%.3f, %.3f, %.3f, %.3f)\n", a0, a1, a2, a3);
-	double norm = sqrt((1 - a0 * a0) / (a1 * a1 + a2 * a2 + a3 * a3));
+	double norm = sqrt((1. - a0 * a0) / (a1 * a1 + a2 * a2 + a3 * a3));
 
 	// a0 /= norm; 
 	a1 *= norm; a2 *= norm; a3 *= norm;
@@ -95,8 +95,8 @@ inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field,
 	int direction;
 	for(unsigned int i = 0; i < dir.size(); i++){
 		direction = dir[i];
-		assert(direction < DIM * 2 && direction > -1);
-		if(direction < DIM){
+		assert(direction < DIMN * 2 && direction > -1);
+		if(direction < DIMN){
 // For the purpose of running updating algorithms on qcdserver, communication is 
 // NOT needed if running on single node. Thus when crossing boundary to get the 
 // link variables we need to regularize the coordinates. 
@@ -106,11 +106,11 @@ inline void get_path_ordered_product(Matrix &prod, const Field<Matrix> &field,
 			mul = mul * field.get_elems_const(y)[direction];
 			y[direction]++;
 		}else{
-			y[direction - DIM]--;
+			y[direction - DIMN]--;
 #ifdef USE_SINGLE_NODE
 			regularize(y, field.geo.node_site);
 #endif
-			dag.Dagger(field.get_elems_const(y)[direction - DIM]);
+			dag.Dagger(field.get_elems_const(y)[direction - DIMN]);
 			mul = mul * dag;
 		}
 	}
@@ -121,15 +121,15 @@ inline double get_plaq(const Field<Matrix> &f, const Coordinate &x){
 	// assuming properly communicated.
 	
 	const qlat::Vector<Matrix> gx = f.get_elems_const(x);
-	vector<qlat::Vector<Matrix> > gxex(DIM);
+	vector<qlat::Vector<Matrix> > gxex(DIMN);
 	Coordinate y;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu]++;
 		gxex[mu] = f.get_elems_const(y);
 	}
 	Matrix m, n;
 	double ret = 0.;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 	for(int nu = 0; nu < mu; nu++){
 		m = gx[mu] * gxex[mu][nu];
 		n.Dagger(gx[nu] * gxex[nu][mu]);
@@ -139,7 +139,7 @@ inline double get_plaq(const Field<Matrix> &f, const Coordinate &x){
 }
 
 inline int symmetric_index_mapping(int mu, int nu){
-	return DIM * nu + mu - (nu + 1) * (nu + 2) / 2;
+	return DIMN * nu + mu - (nu + 1) * (nu + 2) / 2;
 }
 
 inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
@@ -147,22 +147,22 @@ inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
 
 	TIMER("get_rectangular()");
 	const qlat::Vector<Matrix> gx_0_0 = f.get_elems_const(x);
-	vector<qlat::Vector<Matrix> > gx_1_0(DIM);
-	vector<qlat::Vector<Matrix> > gx_2_0(DIM);
+	vector<qlat::Vector<Matrix> > gx_1_0(DIMN);
+	vector<qlat::Vector<Matrix> > gx_2_0(DIMN);
 	vector<qlat::Vector<Matrix> > gx_1_1(6);
 
 	Coordinate y;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu]++;
 		gx_1_0[mu] = f.get_elems_const(y);
 	}
 
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu] += 2;
 		gx_2_0[mu] = f.get_elems_const(y);
 	}
 
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 	for(int nu = 0; nu < mu; nu++){
 		y = x; y[mu]++; y[nu]++;
 //		printf("gx_1_1 index = %d", symmetric_index_mapping(mu, nu));
@@ -177,7 +177,7 @@ inline double get_rectangular(const Field<Matrix> &f, const Coordinate &x){
 	//    3       x
 	double sum = 0.;
 	Matrix m;
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 	for(int nu = 0; nu < mu; nu++){
 		int symmetric_index = symmetric_index_mapping(mu, nu);
 		
@@ -266,7 +266,7 @@ inline double avg_real_trace(const qlat::Field<Matrix> &gauge_field_qlat){
 	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.local_volume(); index++){
 		 Coordinate x_qlat = geo_.coordinate_from_index(index);
-		 for(int mu = 0; mu < DIM; mu++){
+		 for(int mu = 0; mu < DIMN; mu++){
 		 	tr_node_sum += \
 				(gauge_field_qlat.get_elems_const(x_qlat)[mu]).ReTr();
 		 }
@@ -293,14 +293,14 @@ inline double check_constrained_plaquette(const qlat::Field<Matrix> &gField, int
 	for(int x2 = 0; x2 < geo_.node_site[2]; x2 += mag){
 	for(int x3 = 0; x3 < geo_.node_site[3]; x3 += mag){
 		Coordinate x(x0, x1, x2, x3);
-		for(int mu = 0; mu < DIM; mu++){
+		for(int mu = 0; mu < DIMN; mu++){
 		for(int nu = 0; nu < mu; nu++){
 			Matrix m;
 			vector<int> dir; dir.clear();
 			for(int i = 0; i < mag; i++) dir.push_back(mu);
 			for(int i = 0; i < mag; i++) dir.push_back(nu);
-			for(int i = 0; i < mag; i++) dir.push_back(mu + DIM);
-			for(int i = 0; i < mag; i++) dir.push_back(nu + DIM);
+			for(int i = 0; i < mag; i++) dir.push_back(mu + DIMN);
+			for(int i = 0; i < mag; i++) dir.push_back(nu + DIMN);
 			
 			get_path_ordered_product(m, gField, x, dir);
 			

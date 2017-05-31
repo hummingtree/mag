@@ -87,24 +87,24 @@ inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
 	// Assuming properly communicated
  	vector<int> dir; dir.reserve(5);
  	Matrix rec_, m; rec_.ZeroMatrix();
- 	for(int nu = 0; nu < DIM; nu++){
+ 	for(int nu = 0; nu < DIMN; nu++){
  		if(mu == nu) continue;
  		
 		dir.clear();
  		dir.push_back(nu); 
 		dir.push_back(mu);
 		dir.push_back(mu);
-		dir.push_back(nu + DIM);
-		dir.push_back(mu + DIM);
+		dir.push_back(nu + DIMN);
+		dir.push_back(mu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
  		rec_ += m;
  		
 		dir.clear();
- 		dir.push_back(nu + DIM); 
+ 		dir.push_back(nu + DIMN); 
 		dir.push_back(mu);
 		dir.push_back(mu);
 		dir.push_back(nu);
-		dir.push_back(mu + DIM);
+		dir.push_back(mu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
  		rec_ += m;
 
@@ -112,14 +112,14 @@ inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
  		dir.push_back(nu); 
 		dir.push_back(nu);
 		dir.push_back(mu);
-		dir.push_back(nu + DIM);
-		dir.push_back(nu + DIM);
+		dir.push_back(nu + DIMN);
+		dir.push_back(nu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
  		rec_ += m;
 
 		dir.clear();
- 		dir.push_back(nu + DIM); 
-		dir.push_back(nu + DIM);
+ 		dir.push_back(nu + DIMN); 
+		dir.push_back(nu + DIMN);
 		dir.push_back(mu);
 		dir.push_back(nu);
 		dir.push_back(nu);
@@ -127,17 +127,17 @@ inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
  		rec_ += m;	
 
 		dir.clear();
- 		dir.push_back(mu + DIM); 
+ 		dir.push_back(mu + DIMN); 
 		dir.push_back(nu);
 		dir.push_back(mu);
 		dir.push_back(mu);
-		dir.push_back(nu + DIM);
+		dir.push_back(nu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
  		rec_ += m;
 	
 		dir.clear();
- 		dir.push_back(mu + DIM); 
-		dir.push_back(nu + DIM);
+ 		dir.push_back(mu + DIMN); 
+		dir.push_back(nu + DIMN);
 		dir.push_back(mu);
 		dir.push_back(mu);
 		dir.push_back(nu);
@@ -152,36 +152,36 @@ inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field,
 														const Coordinate &x, int mu){
 //	Coordinate y = x;
 //	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
-//	vector<qlat::Vector<Matrix> > gxex(DIM * 2);
-//	for(int alpha = 0; alpha < DIM; alpha++){
+//	vector<qlat::Vector<Matrix> > gxex(DIMN * 2);
+//	for(int alpha = 0; alpha < DIMN; alpha++){
 //		y[alpha]++;
 //		gxex[alpha] = field.get_elems_const(y);
 //		y[alpha] -= 2;
-//		gxex[alpha + DIM] = field.get_elems_const(y);
+//		gxex[alpha + DIMN] = field.get_elems_const(y);
 //		y[alpha]++;
 //	}
 //	Matrix m, dagger, acc; acc.ZeroMatrix();
-//	for(int nu = 0; nu < DIM; nu++){
+//	for(int nu = 0; nu < DIMN; nu++){
 //		if(mu == nu) continue;
 //		dagger.Dagger(gxex[mu][nu]);
 //		acc += (gx[nu] * gxex[nu][mu]) * dagger;
-//		dagger.Dagger(gxex[nu + DIM][nu]);
+//		dagger.Dagger(gxex[nu + DIMN][nu]);
 //		Coordinate z = x; z[nu]--; z[mu]++;
-//		acc += dagger * (gxex[nu + DIM][mu] * field.get_elems_const(z)[nu]);
+//		acc += dagger * (gxex[nu + DIMN][mu] * field.get_elems_const(z)[nu]);
 //	}
 //	staple.Dagger(acc);
 
  	vector<int> dir; dir.reserve(3);
  	Matrix staple_; staple_.ZeroMatrix();
  	Matrix m;
- 	for(int nu = 0; nu < DIM; nu++){
+ 	for(int nu = 0; nu < DIMN; nu++){
  		if(mu == nu) continue;
  		dir.clear();
- 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIM);
+ 		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
  		staple_ += m;
  		dir.clear();
- 		dir.push_back(nu + DIM); dir.push_back(mu); dir.push_back(nu);
+ 		dir.push_back(nu + DIMN); dir.push_back(mu); dir.push_back(nu);
  		get_path_ordered_product(m, field, x, dir);
  		staple_ += m;
  	}
@@ -535,7 +535,7 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
 		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
-		for(int mu = 0; mu < DIM; mu++){
+		for(int mu = 0; mu < DIMN; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
 				case 100: break;
 				// case 100: // test case
@@ -650,7 +650,7 @@ inline double derivative_pair(const Field<Matrix> &gField, const Coordinate &x, 
 
 inline void derivative_field(Field<double> &dField, Field<Matrix> &gField, 
 								const Arg_chmc &arg, bool does_pair = false){
-	for(int i = 0; i < DIM; i++){
+	for(int i = 0; i < DIMN; i++){
 		assert(gField.geo.node_site[i] % dField.geo.node_site[i] == 0); 
 	}
 	fetch_expanded(gField);
@@ -659,7 +659,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 		Coordinate x = dField.geo.coordinate_from_index(index);
 		int spin_color_index;
 		qlat::Vector<double> dx = dField.get_elems(x);
-		for(int mu = 0; mu < DIM; mu++){
+		for(int mu = 0; mu < DIMN; mu++){
 		for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 			spin_color_index = mu * SU3_NUM_OF_GENERATORS + a;
 			if(does_pair)
@@ -679,7 +679,7 @@ inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
 	for(int y = 0; y < gField.geo.node_site[1]; y += arg.mag){
 	for(int z = 0; z < gField.geo.node_site[2]; z += arg.mag){
 	for(int t = 0; t < gField.geo.node_site[3]; t += arg.mag){
-	for(int mu = 0; mu < DIM; mu++){
+	for(int mu = 0; mu < DIMN; mu++){
 	for(int a = 0; a < 8; a++){
 		Coordinate coor(x, y, z, t);
 		local_sum += derivative(gField, coor, mu, a);
@@ -710,14 +710,14 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gauge);
 
 	Coordinate total_size_coarse;
-	for(int i = 0; i < DIM; i++){
+	for(int i = 0; i < DIMN; i++){
 		total_size_coarse[i] = geoLocal.total_site()[i] / arg.mag;
 	}
 	Geometry geo_coarse; 
-	geo_coarse.init(total_size_coarse, DIM * SU3_NUM_OF_GENERATORS);
+	geo_coarse.init(total_size_coarse, DIMN * SU3_NUM_OF_GENERATORS);
 	Field<double> dField; dField.init(geo_coarse);
 
-//	long alpha_size = product(gFieldExt.geo.node_site) * DIM * SU3_NUM_OF_GENERATORS;
+//	long alpha_size = product(gFieldExt.geo.node_site) * DIMN * SU3_NUM_OF_GENERATORS;
 //	vector<vector<double> > dev_list; dev_list.resize(alpha_size);
 
 	double oldH, newH;
@@ -982,11 +982,11 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 
 	//declare coarse lattice variables
 	Coordinate total_size_coarse;
-	for(int i = 0; i < DIM; i++){
+	for(int i = 0; i < DIMN; i++){
 		total_size_coarse[i] = geo_local.total_site()[i] / arg.mag;
 	}
 
-	Geometry geo_local_coarse; geo_local_coarse.init(total_size_coarse, DIM);
+	Geometry geo_local_coarse; geo_local_coarse.init(total_size_coarse, DIMN);
 	Geometry geo_expanded_coarse = geo_local_coarse; geo_expanded_coarse.resize(expansion, expansion);
 	Field<Matrix> gField_coarse; gField_coarse.init(geo_expanded_coarse);
 	Field<Matrix> gField_ext_coarse; gField_ext_coarse.init(geo_expanded_coarse);
