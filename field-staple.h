@@ -134,14 +134,14 @@ inline map<int, vector<vector<int> > > init_twist_index(){
 
 const static map<int, vector<vector<int> > > twist_index = init_twist_index();
 
-inline Matrix chair(const Field<Matrix> &f, const Coordinate &x){
-	return Matrix();
+inline cps::Matrix chair(const Field<cps::Matrix> &f, const Coordinate &x){
+	return cps::Matrix();
 } 
 
-inline Matrix chair_staple_dagger(const Field<Matrix> &f, const Coordinate &x, int mu){
+inline cps::Matrix chair_staple_dagger(const Field<cps::Matrix> &f, const Coordinate &x, int mu){
 	vector<vector<int> >::const_iterator it = chair_index.at(mu).cbegin();
-	Matrix acc; acc.ZeroMatrix();
-	Matrix temp;
+	cps::Matrix acc; acc.ZeroMatrix();
+	cps::Matrix temp;
 	for(; it != chair_index.at(mu).cend(); it++){
 		get_path_ordered_product(temp, f, x, *it);
 		acc = acc + temp;
@@ -149,14 +149,14 @@ inline Matrix chair_staple_dagger(const Field<Matrix> &f, const Coordinate &x, i
 	return acc;
 }
 
-inline Matrix twist(const Field<Matrix> &f, const Coordinate &x){
-	return Matrix();
+inline cps::Matrix twist(const Field<cps::Matrix> &f, const Coordinate &x){
+	return cps::Matrix();
 } 
 
-inline Matrix twist_staple_dagger(const Field<Matrix> &f, const Coordinate &x, int mu){
+inline cps::Matrix twist_staple_dagger(const Field<cps::Matrix> &f, const Coordinate &x, int mu){
 	vector<vector<int> >::const_iterator it = twist_index.at(mu).cbegin();
-	Matrix acc; acc.ZeroMatrix();
-	Matrix temp;
+	cps::Matrix acc; acc.ZeroMatrix();
+	cps::Matrix temp;
 	for(; it != twist_index.at(mu).cend(); it++){
 		get_path_ordered_product(temp, f, x, *it);
 		acc = acc + temp;

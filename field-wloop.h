@@ -23,7 +23,7 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-inline double wilson_loop(const Field<Matrix> &f, const Coordinate &x, 
+inline double wilson_loop(const Field<cps::Matrix> &f, const Coordinate &x, 
 									const array<int, DIMN - 1> &r, int T){
 	
 	assert(T > 0);
@@ -49,13 +49,13 @@ inline double wilson_loop(const Field<Matrix> &f, const Coordinate &x,
 		dir.push_back(DIMN - 1 + DIMN);
 	}
 
-	Matrix m;
+	cps::Matrix m;
 	get_path_ordered_product(m, f, x, dir);
 
 	return m.ReTr();
 }
 
-inline double avg_wilson_loop(const Field<Matrix> &f, 
+inline double avg_wilson_loop(const Field<cps::Matrix> &f, 
 										const array<int, DIMN - 1> &r, int T){
 	TIMER("avg_wilson_loop()");
 	double local_sum = 0.;
@@ -98,11 +98,11 @@ inline double avg_wilson_loop(const Field<Matrix> &f,
 	return global_sum / (perm.size() * get_num_node() * f.geo.local_volume());	
 }
 
-inline void get_staple_spatial(Matrix &staple, const Field<Matrix> &field, 
+inline void get_staple_spatial(cps::Matrix &staple, const Field<cps::Matrix> &field, 
 					const Coordinate &x, const int i){
 	vector<int> dir;
-	Matrix staple_; staple_.ZeroMatrix();
-	Matrix m;
+	cps::Matrix staple_; staple_.ZeroMatrix();
+	cps::Matrix m;
 	for(int j = 0; j < DIMN - 1; j++){
 		if(i == j) continue;
 		dir.clear();
@@ -117,18 +117,18 @@ inline void get_staple_spatial(Matrix &staple, const Field<Matrix> &field,
 	staple = staple_;
 }
 
-inline void ape_smear(Field<Matrix> &f, double coeff, int num){
+inline void ape_smear(Field<cps::Matrix> &f, double coeff, int num){
 	// U_i -> (1 - coeff) * U_i + (coeff / 4) * \SUM(U_i_staples)
 	
 	Geometry geo1 = f.geo;
 	Coordinate expansion(1, 1, 1, 1);
 	geo1.resize(expansion, expansion);
 
-	Field<Matrix> copy; copy.init(geo1, DIMN);
-	Field<Matrix> incr; incr.init(geo1, DIMN);
+	Field<cps::Matrix> copy; copy.init(geo1, DIMN);
+	Field<cps::Matrix> incr; incr.init(geo1, DIMN);
 	copy = f;
 	
-	Chart<Matrix> chart;
+	Chart<cps::Matrix> chart;
 	Gauge gauge;
 	produce_chart_envelope(chart, geo1, gauge);
 
@@ -137,8 +137,8 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
 			Coordinate x = copy.geo.coordinate_from_index(index);
-			qlat::Vector<Matrix> ix = incr.get_elems(x);
-			Matrix m;
+			qlat::Vector<cps::Matrix> ix = incr.get_elems(x);
+			cps::Matrix m;
 			for(int i = 0; i < DIMN - 1; i++){
 				get_staple_spatial(m, copy, x, i);
 				ix[i] = m;
@@ -147,8 +147,8 @@ inline void ape_smear(Field<Matrix> &f, double coeff, int num){
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
 			Coordinate x = copy.geo.coordinate_from_index(index);
-			qlat::Vector<Matrix> cx = copy.get_elems(x);
-			qlat::Vector<Matrix> ix = incr.get_elems(x);
+			qlat::Vector<cps::Matrix> cx = copy.get_elems(x);
+			qlat::Vector<cps::Matrix> ix = incr.get_elems(x);
 			for(int i = 0; i < DIMN - 1; i++){
 				cx[i] = ix[i] * (coeff / 6.) + cx[i] * (1. - coeff);
 // for Sommer scale purposes we don't need to unitarize the matrix.

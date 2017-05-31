@@ -22,7 +22,7 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc &arg, double E_max){
+inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg_chmc &arg, double E_max){
 	// Arxiv:hep-lat/9406019, 27 Jun 1994
 	TIMER("demon_microcanonical()");
 
@@ -47,8 +47,8 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 	
 	Coordinate expansion(2, 2, 2, 2);
 	Geometry geo = gField_ext.geo; geo.resize(expansion, expansion);
-	Field<Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
-	Field<Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
+	Field<cps::Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
+	Field<cps::Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
 
 	fetch_expanded(gField1);
 	S0[0] = -total_plaq(gField1);
@@ -57,14 +57,14 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 	long accept = 0;
 	long reject = 0;
 
-	Matrix m, c;
-	Matrix P, R, C, T;
+	cps::Matrix m, c;
+	cps::Matrix P, R, C, T;
 	vector<double> delta_S(4);
 
 	for(int i = 0; i < arg.num_trajectory; i++){
 		for(long index = 0; index < geo.local_volume(); index++){
 			Coordinate x = coordinate_from_index(index, geo.node_site);
-			qlat::Vector<Matrix> v = gField1.get_elems(x);
+			qlat::Vector<cps::Matrix> v = gField1.get_elems(x);
 			for(int mu = 0; mu < geo.multiplicity; mu++){	
 				get_staple_dagger(P, gField1, x, mu);	
 				get_rectangular_dagger(R, gField1, x, mu);
@@ -136,11 +136,11 @@ inline void demon_microcanonical(const Field<Matrix> &gField_ext, const Arg_chmc
 //
 //	Coordinate expansion(2, 2, 2, 2);
 //	Geometry geo = gField_ext.geo; geo.resize(expansion, expansion);
-//	Field<Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
-//	Field<Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
-//	Field<Matrix> mField; mField.init(geo);
+//	Field<cps::Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
+//	Field<cps::Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
+//	Field<cps::Matrix> mField; mField.init(geo);
 //
-//	Chart<Matrix> chart;
+//	Chart<cps::Matrix> chart;
 //	produce_chart_envelope(chart, geo, arg.gauge);
 //
 //	// TODO: now only for plaquette and rectangular;

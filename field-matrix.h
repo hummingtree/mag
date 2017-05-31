@@ -146,17 +146,11 @@ inline double get_rectangular(const Field<cps::Matrix> &f, const Coordinate &x){
 	// assuming properly communicated.
 
 	TIMER("get_rectangular()");
-<<<<<<< HEAD
-	const qlat::Vector<Matrix> gx_0_0 = f.get_elems_const(x);
-	vector<qlat::Vector<Matrix> > gx_1_0(DIMN);
-	vector<qlat::Vector<Matrix> > gx_2_0(DIMN);
-	vector<qlat::Vector<Matrix> > gx_1_1(6);
-=======
+
 	const qlat::Vector<cps::Matrix> gx_0_0 = f.get_elems_const(x);
-	vector<qlat::Vector<cps::Matrix> > gx_1_0(DIM);
-	vector<qlat::Vector<cps::Matrix> > gx_2_0(DIM);
+	vector<qlat::Vector<cps::Matrix> > gx_1_0(DIMN);
+	vector<qlat::Vector<cps::Matrix> > gx_2_0(DIMN);
 	vector<qlat::Vector<cps::Matrix> > gx_1_1(6);
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
 
 	Coordinate y;
 	for(int mu = 0; mu < DIMN; mu++){
@@ -183,13 +177,8 @@ inline double get_rectangular(const Field<cps::Matrix> &f, const Coordinate &x){
 	// nu 2     x 5
 	//    3       x
 	double sum = 0.;
-<<<<<<< HEAD
-	Matrix m;
-	for(int mu = 0; mu < DIMN; mu++){
-=======
 	cps::Matrix m;
-	for(int mu = 0; mu < DIM; mu++){
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
+	for(int mu = 0; mu < DIMN; mu++){
 	for(int nu = 0; nu < mu; nu++){
 		int symmetric_index = symmetric_index_mapping(mu, nu);
 		

@@ -154,28 +154,17 @@ inline void get_rectangular_dagger(cps::Matrix &rec, const Field<cps::Matrix> &f
 inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &field, 
 														const Coordinate &x, int mu){
 //	Coordinate y = x;
-<<<<<<< HEAD
-//	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
-//	vector<qlat::Vector<Matrix> > gxex(DIMN * 2);
-//	for(int alpha = 0; alpha < DIMN; alpha++){
-=======
 //	const qlat::Vector<cps::Matrix> gx = field.get_elems_const(x);
-//	vector<qlat::Vector<cps::Matrix> > gxex(DIM * 2);
-//	for(int alpha = 0; alpha < DIM; alpha++){
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
+//	vector<qlat::Vector<cps::Matrix> > gxex(DIMN * 2);
+//	for(int alpha = 0; alpha < DIMN; alpha++){
 //		y[alpha]++;
 //		gxex[alpha] = field.get_elems_const(y);
 //		y[alpha] -= 2;
 //		gxex[alpha + DIMN] = field.get_elems_const(y);
 //		y[alpha]++;
 //	}
-<<<<<<< HEAD
-//	Matrix m, dagger, acc; acc.ZeroMatrix();
-//	for(int nu = 0; nu < DIMN; nu++){
-=======
 //	cps::Matrix m, dagger, acc; acc.ZeroMatrix();
-//	for(int nu = 0; nu < DIM; nu++){
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
+//	for(int nu = 0; nu < DIMN; nu++){
 //		if(mu == nu) continue;
 //		dagger.Dagger(gxex[mu][nu]);
 //		acc += (gx[nu] * gxex[nu][mu]) * dagger;
@@ -186,15 +175,9 @@ inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &fie
 //	staple.Dagger(acc);
 
  	vector<int> dir; dir.reserve(3);
-<<<<<<< HEAD
- 	Matrix staple_; staple_.ZeroMatrix();
- 	Matrix m;
- 	for(int nu = 0; nu < DIMN; nu++){
-=======
  	cps::Matrix staple_; staple_.ZeroMatrix();
  	cps::Matrix m;
- 	for(int nu = 0; nu < DIM; nu++){
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
+ 	for(int nu = 0; nu < DIMN; nu++){
  		if(mu == nu) continue;
  		dir.clear();
  		dir.push_back(nu); dir.push_back(mu); dir.push_back(nu + DIMN);
@@ -554,13 +537,8 @@ inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matri
 #pragma omp for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
-<<<<<<< HEAD
-		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
-		for(int mu = 0; mu < DIMN; mu++){
-=======
 		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
-		for(int mu = 0; mu < DIM; mu++){
->>>>>>> aba101a7b943edf4558ad2bd7ad2fa4ddfbfd742
+		for(int mu = 0; mu < DIMN; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
 				case 100: break;
 				// case 100: // test case
