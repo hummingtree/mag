@@ -27,8 +27,8 @@ QLAT_START_NAMESPACE
 
 static const double inv_sqrt2 = 1. / sqrt(2.);
 
-inline vector<Matrix> init_generators(){
-	Matrix T1, T2, T3, T4, T5, T6, T7, T8;
+inline vector<cps::Matrix> init_generators(){
+	cps::Matrix T1, T2, T3, T4, T5, T6, T7, T8;
 	// the eight Hermitian generators of SU3	
 	T1.ZeroMatrix();
 	T1(0, 1) = qlat::Complex(1., 0.);  T1(1, 0) = qlat::Complex(1., 0.);
@@ -63,15 +63,15 @@ inline vector<Matrix> init_generators(){
 	T8(2, 2) = qlat::Complex(-2., 0.);
 	T8 *= 1. / sqrt(6.);
 	
-	vector<Matrix> ret {T1, T2, T3, T4, T5, T6, T7, T8};
+	vector<cps::Matrix> ret {T1, T2, T3, T4, T5, T6, T7, T8};
 	
 	return ret;
 }
 
-static const vector<Matrix> su3_generators = init_generators();
+static const vector<cps::Matrix> su3_generators = init_generators();
 
-inline void exp(Matrix &expM, const Matrix &M){
-        Matrix mTemp2 = M, mTemp3;
+inline void exp(cps::Matrix &expM, const cps::Matrix &M){
+        cps::Matrix mTemp2 = M, mTemp3;
 	for(int i = 9; i > 1; i--){
 		mTemp3.OneMinusfTimesM(-1. / i, mTemp2);
 		mTemp2.DotMEqual(M, mTemp3);
@@ -79,17 +79,17 @@ inline void exp(Matrix &expM, const Matrix &M){
 	expM.OneMinusfTimesM(-1., mTemp2);
 }
 
-inline void algebra_to_group(Matrix &expiM, const Matrix &M){
+inline void algebra_to_group(cps::Matrix &expiM, const cps::Matrix &M){
 	// expiM = exp(i * M)
-	Matrix mTemp = M; mTemp *= qlat::Complex(0., 1.);
+	cps::Matrix mTemp = M; mTemp *= qlat::Complex(0., 1.);
 	exp(expiM, mTemp);
 }
 
-inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
+inline void get_rectangular_dagger(cps::Matrix &rec, const Field<cps::Matrix> &field,
 														const Coordinate &x, int mu){
 	// Assuming properly communicated
  	vector<int> dir; dir.reserve(5);
- 	Matrix rec_, m; rec_.ZeroMatrix();
+ 	cps::Matrix rec_, m; rec_.ZeroMatrix();
  	for(int nu = 0; nu < DIM; nu++){
  		if(mu == nu) continue;
  		
@@ -151,11 +151,11 @@ inline void get_rectangular_dagger(Matrix &rec, const Field<Matrix> &field,
 	rec.Dagger(rec_);
 }
 
-inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field, 
+inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &field, 
 														const Coordinate &x, int mu){
 //	Coordinate y = x;
-//	const qlat::Vector<Matrix> gx = field.get_elems_const(x);
-//	vector<qlat::Vector<Matrix> > gxex(DIM * 2);
+//	const qlat::Vector<cps::Matrix> gx = field.get_elems_const(x);
+//	vector<qlat::Vector<cps::Matrix> > gxex(DIM * 2);
 //	for(int alpha = 0; alpha < DIM; alpha++){
 //		y[alpha]++;
 //		gxex[alpha] = field.get_elems_const(y);
@@ -163,7 +163,7 @@ inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field,
 //		gxex[alpha + DIM] = field.get_elems_const(y);
 //		y[alpha]++;
 //	}
-//	Matrix m, dagger, acc; acc.ZeroMatrix();
+//	cps::Matrix m, dagger, acc; acc.ZeroMatrix();
 //	for(int nu = 0; nu < DIM; nu++){
 //		if(mu == nu) continue;
 //		dagger.Dagger(gxex[mu][nu]);
@@ -175,8 +175,8 @@ inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field,
 //	staple.Dagger(acc);
 
  	vector<int> dir; dir.reserve(3);
- 	Matrix staple_; staple_.ZeroMatrix();
- 	Matrix m;
+ 	cps::Matrix staple_; staple_.ZeroMatrix();
+ 	cps::Matrix m;
  	for(int nu = 0; nu < DIM; nu++){
  		if(mu == nu) continue;
  		dir.clear();
@@ -192,10 +192,10 @@ inline void get_staple_dagger(Matrix &staple, const Field<Matrix> &field,
 
 }
 
-inline void get_extended_staple_dagger(Matrix &stp, const Field<Matrix> &f,
+inline void get_extended_staple_dagger(cps::Matrix &stp, const Field<cps::Matrix> &f,
 									const Coordinate &x, int mu, double c1){
 	double c0 = (1 - 8. * c1);
-	Matrix m0, m1;
+	cps::Matrix m0, m1;
 	get_staple_dagger(m0, f, x, mu);
 	get_rectangular_dagger(m1, f, x, mu);
 	stp = m0 * c0 + m1 * c1; 
@@ -269,7 +269,7 @@ inline int is_constrained(const Coordinate &x, int mu, int mag)
 	}
 }
 
-inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
+inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gField,
 			const Arg_chmc &arg){
 	TIMER("get_force()");
 	assert(is_matching_geo(fField.geo, gField.geo));
@@ -278,10 +278,10 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 #pragma omp parallel for
 		for(long index = 0; index < fField.geo.local_volume(); index++){
 			Coordinate x; 
-			Matrix mStaple1, mStaple2, mTemp;
+			cps::Matrix mStaple1, mStaple2, mTemp;
 			x = fField.geo.coordinate_from_index(index);
-			const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
-			qlat::Vector<Matrix> fx = fField.get_elems(x);
+			const qlat::Vector<cps::Matrix> gx = gField.get_elems_const(x);
+			qlat::Vector<cps::Matrix> fx = fField.get_elems(x);
 			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
 				switch(is_constrained(x, mu, arg.mag)){
 				case 0: {
@@ -318,10 +318,10 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 #pragma omp parallel for
 		for(long index = 0; index < fField.geo.local_volume(); index++){
 			Coordinate x; 
-			Matrix mStaple1, mStaple2, mTemp;
+			cps::Matrix mStaple1, mStaple2, mTemp;
 			x = fField.geo.coordinate_from_index(index);
-			const qlat::Vector<Matrix> gx = gField.get_elems_const(x);
-			qlat::Vector<Matrix> fx = fField.get_elems(x);
+			const qlat::Vector<cps::Matrix> gx = gField.get_elems_const(x);
+			qlat::Vector<cps::Matrix> fx = fField.get_elems(x);
 			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
 				switch(is_constrained(x, mu, arg.mag)){
 				case 0: {
@@ -357,34 +357,34 @@ inline void get_force(Field<Matrix> &fField, const Field<Matrix> &gField,
 	}
 }
 
-inline void evolve_momentum(Field<Matrix> &mField, 
-				const Field<Matrix> &fField, double dt, 
+inline void evolve_momentum(Field<cps::Matrix> &mField, 
+				const Field<cps::Matrix> &fField, double dt, 
 				const Arg_chmc &arg){
 	TIMER("evolve_momentum()");
 	assert(is_matching_geo(mField.geo, fField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
-		const qlat::Vector<Matrix> fx = fField.get_elems_const(x);
-			  qlat::Vector<Matrix> mx = mField.get_elems(x);
+		const qlat::Vector<cps::Matrix> fx = fField.get_elems_const(x);
+			  qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mx[mu] += fx[mu] * dt;
 	}}
 }
 
-inline void evolve_gauge_field(Field<Matrix> &gField, 
-				const Field<Matrix> &mField, double dt, 
+inline void evolve_gauge_field(Field<cps::Matrix> &gField, 
+				const Field<cps::Matrix> &mField, double dt, 
 				const Arg_chmc &arg){
 	TIMER("evolve_gauge_field()");
 	assert(is_matching_geo(mField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < gField.geo.local_volume(); index++){
 		Coordinate x = gField.geo.coordinate_from_index(index);
-		Matrix mL, mR;
-		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
-			  qlat::Vector<Matrix> gx = gField.get_elems(x);
+		cps::Matrix mL, mR;
+		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
+			  qlat::Vector<cps::Matrix> gx = gField.get_elems(x);
 		for(int mu = 0; mu < gField.geo.multiplicity; mu++){
-		// only works for Matrix
+		// only works for cps::Matrix
 			Coordinate y(x); y[mu]--;
 			switch(is_constrained(x, mu, arg.mag)){
 			case 0: {
@@ -414,8 +414,8 @@ inline void evolve_gauge_field(Field<Matrix> &gField,
 	}}
 }
 
-inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-					const Arg_chmc &arg, Chart<Matrix> &chart){
+inline void force_gradient_integrator(Field<cps::Matrix> &gField, Field<cps::Matrix> &mField, 
+					const Arg_chmc &arg, Chart<cps::Matrix> &chart){
 	// now this CANNOT be used in a multigrid algorithm
 	TIMER("force_gradient_integrator()"); 
 
@@ -424,8 +424,8 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 	const double beta = arg.dt / sqrt(3.);
 	const double gamma = (2. - sqrt(3.)) * arg.dt * arg.dt / 12.;
 	
-	static Field<Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
-	static Field<Matrix> fField; fField.init(mField.geo);
+	static Field<cps::Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
+	static Field<cps::Matrix> fField; fField.init(mField.geo);
 
 	evolve_gauge_field(gField, mField, alpha, arg);
 	
@@ -455,9 +455,9 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
 }
 
-inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-										Field<Matrix> &gFieldAuxil, Field<Matrix> &fField,
-										const Arg_chmc &arg, Chart<Matrix> &chart){
+inline void force_gradient_integrator(Field<cps::Matrix> &gField, Field<cps::Matrix> &mField, 
+										Field<cps::Matrix> &gFieldAuxil, Field<cps::Matrix> &fField,
+										const Arg_chmc &arg, Chart<cps::Matrix> &chart){
 	// now this CANNOT be used in a multigrid algorithm
 	sync_node();
 	TIMER("force_gradient_integrator()"); 
@@ -499,15 +499,15 @@ inline void force_gradient_integrator(Field<Matrix> &gField, Field<Matrix> &mFie
 	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
 }
 
-inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField, 
-				const Arg_chmc &arg, Chart<Matrix> chart){
+inline void leap_frog_integrator(Field<cps::Matrix> &gField, Field<cps::Matrix> &mField, 
+				const Arg_chmc &arg, Chart<cps::Matrix> chart){
 	// not for multigrid
 
 	TIMER("leap_frog_integrator()");
 	assert(is_matching_geo(gField.geo, mField.geo));
 	Geometry geo_; 
 	geo_.init(gField.geo.geon, gField.geo.multiplicity, gField.geo.node_site);
-	static Field<Matrix> fField; fField.init(geo_);
+	static Field<cps::Matrix> fField; fField.init(geo_);
 	evolve_gauge_field(gField, mField, arg.dt / 2., arg);
 	for(int i = 0; i < arg.trajectory_length; i++){
 		fetch_expanded_chart(gField, chart);
@@ -519,8 +519,8 @@ inline void leap_frog_integrator(Field<Matrix> &gField, Field<Matrix> &mField,
 	}
 }
 
-inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField,
-				const Arg_chmc &arg, Chart<Matrix> &chart, vector<double> &part){
+inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matrix> &mField,
+				const Arg_chmc &arg, Chart<cps::Matrix> &chart, vector<double> &part){
 	
 	TIMER("get_hamiltonian()");
 	double localSum = 0.; // local sum of tr(\pi*\pi^\dagger)
@@ -537,7 +537,7 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 #pragma omp for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
-		const qlat::Vector<Matrix> mx = mField.get_elems_const(x);
+		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
 		for(int mu = 0; mu < DIM; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
 				case 100: break;
@@ -576,7 +576,7 @@ inline double get_hamiltonian(Field<Matrix> &gField, const Field<Matrix> &mField
 	return kineticEnergy + potential_energy;
 }
 
-inline void init_momentum(Field<Matrix> &mField){
+inline void init_momentum(Field<cps::Matrix> &mField){
 	TIMER("init_momentum()");
 
 	using namespace qlat;
@@ -592,8 +592,8 @@ inline void init_momentum(Field<Matrix> &mField){
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
-		qlat::Vector<Matrix> mx = mField.get_elems(x);
-		Matrix mTemp;
+		qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
+		cps::Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
@@ -603,15 +603,15 @@ inline void init_momentum(Field<Matrix> &mField){
 	}}
 }
 
-inline void init_momentum(Field<Matrix> &mField, RngField &rng_field){
+inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field){
 	TIMER("init_momentum()");
 	using namespace qlat;
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		Coordinate x = mField.geo.coordinate_from_index(index);
-		qlat::Vector<Matrix> mx = mField.get_elems(x);
-		Matrix mTemp;
+		qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
+		cps::Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
@@ -621,37 +621,37 @@ inline void init_momentum(Field<Matrix> &mField, RngField &rng_field){
 	}}
 }
 
-inline double derivative(const Field<Matrix> &gField, const Coordinate &x, int mu, int a){
-	Matrix &U = gField.get_elems_const(x)[mu];
-	Matrix V_dagger; get_staple_dagger(V_dagger, gField, x, mu);
-	Matrix temp = su3_generators[a] * U * V_dagger * qlat::Complex(0., 1.);
+inline double derivative(const Field<cps::Matrix> &gField, const Coordinate &x, int mu, int a){
+	cps::Matrix &U = gField.get_elems_const(x)[mu];
+	cps::Matrix V_dagger; get_staple_dagger(V_dagger, gField, x, mu);
+	cps::Matrix temp = su3_generators[a] * U * V_dagger * qlat::Complex(0., 1.);
 	return temp.ReTr();
 }
 
-inline double derivative_Iwasaki(const Field<Matrix> &gField, 
+inline double derivative_Iwasaki(const Field<cps::Matrix> &gField, 
 									const Coordinate &x, int mu, int a, const Arg_chmc &arg){
 	double c1 = arg.gauge.c1;
 	double c0 = 1. - 8. * c1;
-	Matrix &u = gField.get_elems_const(x)[mu];
-	Matrix stp_dagger; get_staple_dagger(stp_dagger, gField, x, mu);
-	Matrix rtg_dagger; get_rectangular_dagger(rtg_dagger, gField, x, mu);
-	Matrix tot_dagger = stp_dagger * c0 + rtg_dagger * c1;
-	Matrix temp = su3_generators[a] * u * tot_dagger * qlat::Complex(0., 1.);
+	cps::Matrix &u = gField.get_elems_const(x)[mu];
+	cps::Matrix stp_dagger; get_staple_dagger(stp_dagger, gField, x, mu);
+	cps::Matrix rtg_dagger; get_rectangular_dagger(rtg_dagger, gField, x, mu);
+	cps::Matrix tot_dagger = stp_dagger * c0 + rtg_dagger * c1;
+	cps::Matrix temp = su3_generators[a] * u * tot_dagger * qlat::Complex(0., 1.);
 	return temp.ReTr();
 }
 
-inline double derivative_pair(const Field<Matrix> &gField, const Coordinate &x, int mu, int b){
+inline double derivative_pair(const Field<cps::Matrix> &gField, const Coordinate &x, int mu, int b){
 	Coordinate y = x; y[mu]++;
-	Matrix &U1 = gField.get_elems_const(x)[mu];								
-	Matrix &U2 = gField.get_elems_const(y)[mu];
-	Matrix V1_dagger; get_staple_dagger(V1_dagger, gField, x, mu);
-	Matrix V2_dagger; get_staple_dagger(V2_dagger, gField, y, mu);
-	Matrix temp1 = su3_generators[b] * V1_dagger * U1 * qlat::Complex(0., -1.);
-	Matrix temp2 = su3_generators[b] * U2 * V2_dagger * qlat::Complex(0., 1.);
+	cps::Matrix &U1 = gField.get_elems_const(x)[mu];								
+	cps::Matrix &U2 = gField.get_elems_const(y)[mu];
+	cps::Matrix V1_dagger; get_staple_dagger(V1_dagger, gField, x, mu);
+	cps::Matrix V2_dagger; get_staple_dagger(V2_dagger, gField, y, mu);
+	cps::Matrix temp1 = su3_generators[b] * V1_dagger * U1 * qlat::Complex(0., -1.);
+	cps::Matrix temp2 = su3_generators[b] * U2 * V2_dagger * qlat::Complex(0., 1.);
 	return (temp1 + temp2).ReTr();
 }
 
-inline void derivative_field(Field<double> &dField, Field<Matrix> &gField, 
+inline void derivative_field(Field<double> &dField, Field<cps::Matrix> &gField, 
 								const Arg_chmc &arg, bool does_pair = false){
 	for(int i = 0; i < DIM; i++){
 		assert(gField.geo.node_site[i] % dField.geo.node_site[i] == 0); 
@@ -674,7 +674,7 @@ inline void derivative_field(Field<double> &dField, Field<Matrix> &gField,
 	}
 }
 
-inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
+inline double derivative_sum(Field<cps::Matrix> &gField, const Arg_chmc &arg){
 	fetch_expanded(gField);
 	double local_sum = 0.;
 	long count;
@@ -696,7 +696,7 @@ inline double derivative_sum(Field<Matrix> &gField, const Arg_chmc &arg){
 	return global_sum;
 }
 
-inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile){
+inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile){
 	TIMER("run_chmc()");
 	if(!get_id_node()) assert(pFile != NULL);
 	assert(arg.num_trajectory > 20);
@@ -706,10 +706,10 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	Coordinate expansion(2, 2, 2, 2);
 	Geometry geoExpand1 = gFieldExt.geo; geoExpand1.resize(expansion, expansion);
 	Geometry geoLocal = gFieldExt.geo;
-	Field<Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
-	Field<Matrix> mField; mField.init(geoLocal);
+	Field<cps::Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
+	Field<cps::Matrix> mField; mField.init(geoLocal);
 
-	Chart<Matrix> chart;
+	Chart<cps::Matrix> chart;
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gauge);
 
 	Coordinate total_size_coarse;
@@ -832,9 +832,9 @@ inline void run_chmc(Field<Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile)
 	Timer::display();
 }
 
-inline void update_field(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field<Matrix> &mField,
-						Field<Matrix> &gFieldAuxil, Field<Matrix> &fField, RngField &rng_field, 
-						const Arg_chmc &arg, Chart<Matrix> &chart, FILE *p_summary, int count, 
+inline void update_field(Field<cps::Matrix> &gField_ext, Field<cps::Matrix> &gField, Field<cps::Matrix> &mField,
+						Field<cps::Matrix> &gFieldAuxil, Field<cps::Matrix> &fField, RngField &rng_field, 
+						const Arg_chmc &arg, Chart<cps::Matrix> &chart, FILE *p_summary, int count, 
 						RngState &globalRngState){
 
 	static double old_hamiltonian;
@@ -914,7 +914,7 @@ inline void update_field(Field<Matrix> &gField_ext, Field<Matrix> &gField, Field
 
 }
 
-inline void update_constrain(Field<Matrix> &gField, const Field<Matrix> &gField_coarse, 
+inline void update_constrain(Field<cps::Matrix> &gField, const Field<cps::Matrix> &gField_coarse, 
 								const Arg_chmc &arg){
 	assert(gField.geo.total_site() == arg.mag * gField_coarse.geo.total_site());
 	
@@ -923,21 +923,21 @@ inline void update_constrain(Field<Matrix> &gField, const Field<Matrix> &gField_
     for(long index = 0; index < gField_coarse.geo.local_volume(); index++){
 		Coordinate xC = gField_coarse.geo.coordinate_from_index(index);
 		Coordinate x = arg.mag * xC;
-		qlat::Vector<Matrix> pC = gField_coarse.get_elems_const(xC);
-		qlat::Vector<Matrix> p = gField.get_elems(x);
+		qlat::Vector<cps::Matrix> pC = gField_coarse.get_elems_const(xC);
+		qlat::Vector<cps::Matrix> p = gField.get_elems(x);
 		for(int mu = 0; mu < gField_coarse.geo.multiplicity; mu++){
 			Coordinate xP = x; xP[mu]++;
 			vector<int> cotta(arg.mag - 1, mu);
-			Matrix m;
+			cps::Matrix m;
 			get_path_ordered_product(m, gField, xP, cotta);
-			Matrix d; d.Dagger(m);
+			cps::Matrix d; d.Dagger(m);
 			p[mu] = pC[mu] * d;
     }}
     sync_node();
     qlat::Printf("Coarse lattice initialized.\n");
 }
 
-inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg, 
+inline void double_multigrid(Field<cps::Matrix> &gField_ext, const Arg_chmc &arg, 
 														const Arg_chmc &arg_coarse){
 	
 	// perform a number of fine updates and them a number of coarse updates.
@@ -973,10 +973,10 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 	// declare fine lattice variables
 	Geometry geo_expanded = gField_ext.geo; geo_expanded.resize(expansion, expansion);
 	Geometry geo_local = gField_ext.geo;
-	Field<Matrix> gField; gField.init(geo_expanded); gField = gField_ext;
-	Field<Matrix> gField_auxil; gField_auxil.init(geo_expanded);
-	Field<Matrix> mField; mField.init(geo_expanded);
-	Field<Matrix> fField; fField.init(geo_expanded);
+	Field<cps::Matrix> gField; gField.init(geo_expanded); gField = gField_ext;
+	Field<cps::Matrix> gField_auxil; gField_auxil.init(geo_expanded);
+	Field<cps::Matrix> mField; mField.init(geo_expanded);
+	Field<cps::Matrix> fField; fField.init(geo_expanded);
 
 	Geometry rng_geo; 
 	rng_geo.init(mField.geo.geon, 1, mField.geo.node_site);
@@ -991,11 +991,11 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 
 	Geometry geo_local_coarse; geo_local_coarse.init(total_size_coarse, DIM);
 	Geometry geo_expanded_coarse = geo_local_coarse; geo_expanded_coarse.resize(expansion, expansion);
-	Field<Matrix> gField_coarse; gField_coarse.init(geo_expanded_coarse);
-	Field<Matrix> gField_ext_coarse; gField_ext_coarse.init(geo_expanded_coarse);
-	Field<Matrix> gField_auxil_coarse; gField_auxil_coarse.init(geo_expanded_coarse);
-	Field<Matrix> mField_coarse; mField_coarse.init(geo_expanded_coarse);
-	Field<Matrix> fField_coarse; fField_coarse.init(geo_expanded_coarse);
+	Field<cps::Matrix> gField_coarse; gField_coarse.init(geo_expanded_coarse);
+	Field<cps::Matrix> gField_ext_coarse; gField_ext_coarse.init(geo_expanded_coarse);
+	Field<cps::Matrix> gField_auxil_coarse; gField_auxil_coarse.init(geo_expanded_coarse);
+	Field<cps::Matrix> mField_coarse; mField_coarse.init(geo_expanded_coarse);
+	Field<cps::Matrix> fField_coarse; fField_coarse.init(geo_expanded_coarse);
 	
 	// initialize the coarse field.
 	sync_node();
@@ -1023,9 +1023,9 @@ inline void double_multigrid(Field<Matrix> &gField_ext, const Arg_chmc &arg,
 	rng_field_coarse.init(rng_geo_coarse, RngState("Tut mir leid."));
 
 	// declare the communication patterns
-	Chart<Matrix> chart;
+	Chart<cps::Matrix> chart;
 	produce_chart_envelope(chart, gField_ext.geo, arg.gauge);
-	Chart<Matrix> chart_coarse;
+	Chart<cps::Matrix> chart_coarse;
 	produce_chart_envelope(chart_coarse, gField_coarse.geo, arg_coarse.gauge);
 
 	// start the HMC 

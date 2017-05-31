@@ -78,20 +78,20 @@ int main(int argc, char* argv[]){
 	Geometry expanded_geo; expanded_geo.init(expanded_size, DIM);
 	expanded_geo.resize(expansion, expansion);
 
-	int start = 	130;
-	int end = 		211;
-	int interval = 	10; 
+	int start = 	1020;
+	int end = 		1021;
+	int interval = 	40; 
 
 	string original_config;
 	string expanded_config;
 
 	for(int i = start; i < end; i += interval){
-		original_config = str_printf("/bgusr/home/jtu/weird_ens/12x32ID/configurations/ckpoint_lat.%d", i);
+		original_config = str_printf("/bgusr/home/jtu/weird_ens/12x32x12ID-B/configurations/ckpoint_lat.%d", i);
 
-		expanded_config = str_printf("./configurations/12x32ID_24x64/ckpoint_lat.%d", i);
+		expanded_config = str_printf("./configurations/12x32x12ID-B_24x64x12ID-C/ckpoint_lat.%d", i);
 
 		mkdir("./configurations", 0777);	
-		mkdir("./configurations/12x32ID_24x64", 0777);	
+		mkdir("./configurations/12x32x12ID-B_24x64x12ID-C", 0777);	
 			
 		lattice_expansion(mag, original_geo, expanded_geo, original_config, expanded_config);
 	}
