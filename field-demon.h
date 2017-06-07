@@ -22,7 +22,7 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg_chmc &arg, double E_max){
+inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg_chmc &arg, double E_max, const std::string& info){
 	// Arxiv:hep-lat/9406019, 27 Jun 1994
 	TIMER("demon_microcanonical()");
 
@@ -37,7 +37,7 @@ inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg
 
 	FILE *p = NULL;
 	if(arg.summary_dir_stem.size() > 0){
-		p = Fopen((arg.summary_dir_stem + "/demon_equil.dat").c_str(), "a");
+		p = Fopen((arg.summary_dir_stem + "/demon_equil" + info + ".dat").c_str(), "a");
 	}
 	
 	// TODO: now only for plaquette and rectangular;
