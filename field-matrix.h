@@ -76,7 +76,7 @@ inline double reunitarize(Field<cps::Matrix> &field){
 	double maxDev = 0.;
 	cps::Matrix oldElem;
         for(long index = 0; index < field.geo.local_volume(); index++){
-                Coordinate x = field.geo.coordinate_from_index(index);
+                qlat::Coordinate x = field.geo.coordinate_from_index(index);
                 for(int mu = 0; mu < field.geo.multiplicity; mu++){
 			cps::Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
@@ -87,11 +87,11 @@ inline double reunitarize(Field<cps::Matrix> &field){
 }
 
 inline void get_path_ordered_product(cps::Matrix &prod, const Field<cps::Matrix> &field, 
-					const Coordinate &x, const vector<int> &dir){
+					const qlat::Coordinate &x, const vector<int> &dir){
 
 	cps::Matrix mul; mul.UnitMatrix();
 	cps::Matrix dag;
-	Coordinate y(x);
+	qlat::Coordinate y(x);
 	int direction;
 	for(unsigned int i = 0; i < dir.size(); i++){
 		direction = dir[i];
@@ -117,12 +117,12 @@ inline void get_path_ordered_product(cps::Matrix &prod, const Field<cps::Matrix>
 	prod = mul;
 }
 
-inline double get_plaq(const Field<cps::Matrix> &f, const Coordinate &x){
+inline double get_plaq(const Field<cps::Matrix> &f, const qlat::Coordinate &x){
 	// assuming properly communicated.
 	
 	const qlat::Vector<cps::Matrix> gx = f.get_elems_const(x);
 	vector<qlat::Vector<cps::Matrix> > gxex(DIMN);
-	Coordinate y;
+	qlat::Coordinate y;
 	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu]++;
 		gxex[mu] = f.get_elems_const(y);
@@ -142,7 +142,7 @@ inline int symmetric_index_mapping(int mu, int nu){
 	return DIMN * nu + mu - (nu + 1) * (nu + 2) / 2;
 }
 
-inline double get_rectangular(const Field<cps::Matrix> &f, const Coordinate &x){
+inline double get_rectangular(const Field<cps::Matrix> &f, const qlat::Coordinate &x){
 	// assuming properly communicated.
 
 	TIMER("get_rectangular()");
@@ -152,7 +152,7 @@ inline double get_rectangular(const Field<cps::Matrix> &f, const Coordinate &x){
 	vector<qlat::Vector<cps::Matrix> > gx_2_0(DIMN);
 	vector<qlat::Vector<cps::Matrix> > gx_1_1(6);
 
-	Coordinate y;
+	qlat::Coordinate y;
 	for(int mu = 0; mu < DIMN; mu++){
 		y = x; y[mu]++;
 		gx_1_0[mu] = f.get_elems_const(y);
@@ -209,7 +209,7 @@ inline double total_plaq(const qlat::Field<cps::Matrix> &f){
 #pragma omp barrier
 #pragma omp for
 	for(long index = 0; index < f.geo.local_volume(); index++){
-		Coordinate x = f.geo.coordinate_from_index(index);
+		qlat::Coordinate x = f.geo.coordinate_from_index(index);
 			p_local_sum += get_plaq(f, x);
 	}
 		pp_local_sum[omp_get_thread_num()] = p_local_sum;
@@ -242,7 +242,7 @@ inline double total_rectangular(const qlat::Field<cps::Matrix> &f){
 #pragma omp barrier
 #pragma omp for
 	for(long index = 0; index < f.geo.local_volume(); index++){
-		Coordinate x = f.geo.coordinate_from_index(index);
+		qlat::Coordinate x = f.geo.coordinate_from_index(index);
 			p_local_sum += get_rectangular(f, x);
 	}
 		pp_local_sum[omp_get_thread_num()] = p_local_sum;
@@ -266,7 +266,7 @@ inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 	qlat::Geometry geo_ = gauge_field_qlat.geo;
 	double tr_node_sum = 0.;
 	for(long index = 0; index < geo_.local_volume(); index++){
-		 Coordinate x_qlat = geo_.coordinate_from_index(index);
+		 qlat::Coordinate x_qlat = geo_.coordinate_from_index(index);
 		 for(int mu = 0; mu < DIMN; mu++){
 		 	tr_node_sum += \
 				(gauge_field_qlat.get_elems_const(x_qlat)[mu]).ReTr();
@@ -279,11 +279,11 @@ inline double avg_real_trace(const qlat::Field<cps::Matrix> &gauge_field_qlat){
 }
 
 inline double check_constrained_plaquette(const qlat::Field<cps::Matrix> &gField, int mag){
-	std::vector<Coordinate> dir_vec(4);
-	dir_vec[0] = Coordinate(1, 0, 0, 0);
-	dir_vec[1] = Coordinate(0, 1, 0, 0);
-	dir_vec[2] = Coordinate(0, 0, 1, 0);
-	dir_vec[3] = Coordinate(0, 0, 0, 1);
+	std::vector<qlat::Coordinate> dir_vec(4);
+	dir_vec[0] = qlat::Coordinate(1, 0, 0, 0);
+	dir_vec[1] = qlat::Coordinate(0, 1, 0, 0);
+	dir_vec[2] = qlat::Coordinate(0, 0, 1, 0);
+	dir_vec[3] = qlat::Coordinate(0, 0, 0, 1);
 
 	qlat::Geometry geo_ = gField.geo;
 	
@@ -293,7 +293,7 @@ inline double check_constrained_plaquette(const qlat::Field<cps::Matrix> &gField
 	for(int x1 = 0; x1 < geo_.node_site[1]; x1 += mag){
 	for(int x2 = 0; x2 < geo_.node_site[2]; x2 += mag){
 	for(int x3 = 0; x3 < geo_.node_site[3]; x3 += mag){
-		Coordinate x(x0, x1, x2, x3);
+		qlat::Coordinate x(x0, x1, x2, x3);
 		for(int mu = 0; mu < DIMN; mu++){
 		for(int nu = 0; nu < mu; nu++){
 			cps::Matrix m;
@@ -329,7 +329,7 @@ inline void export_config_nersc(const Field<cps::Matrix> &field, const string &d
 
 	Geometry geo_expand_one;
 	geo_expand_one.init(field.geo.geon, field.geo.multiplicity, field.geo.node_site);
-	Coordinate expansion(1, 1, 1, 1);
+	qlat::Coordinate expansion(1, 1, 1, 1);
 	geo_expand_one.resize(expansion, expansion);
 
 	Field<cps::Matrix> field_cp; field_cp.init(geo_expand_one);
@@ -475,7 +475,7 @@ inline void import_config_nersc(Field<cps::Matrix> &field, const string import,
 	char line[CSTRING_MAX];
 	char desc[CSTRING_MAX];
 
-	Coordinate dim;
+	qlat::Coordinate dim;
 	uint32_t checksum = 0;
 	double plaquette = 0.;
 	char type[CSTRING_MAX];
@@ -547,14 +547,19 @@ inline void import_config_nersc(Field<cps::Matrix> &field, const string import,
 		from_big_endian_64((char*)field_truncated.field.data(), 
 								sizeof(MatrixTruncatedSU3) * field_truncated.field.size());
 
+//		uint64_t* p = (uint64_t*)field_truncated.field.data();
+//		for(size_t i = 0; i < sizeof(MatrixTruncatedSU3) * field_truncated.field.size() / 8; i++){
+//			p[i] = flip_endian_64(p[i]);
+//		}
+
 		uint32_t computed_checksum = fieldChecksumSum32(field_truncated);
 		if(computed_checksum != checksum){
-			qlat::Printf("WRONG Checksum: %x(labeled) vs %x(computed)\n", checksum, computed_checksum);
+			printf("WRONG Checksum: %x(labeled) vs %x(computed)\n", checksum, computed_checksum);
 			assert(false);
 		}
 
 		for(long index = 0; index < geo_.local_volume(); index++){
-			Coordinate x = geo_.coordinate_from_index(index);
+			qlat::Coordinate x = geo_.coordinate_from_index(index);
 			qlat::Vector<MatrixTruncatedSU3> p_from = field_truncated.get_elems(x);
 			qlat::Vector<cps::Matrix> p_to = field.get_elems(x);
 			for(int mu = 0; mu < geo_.multiplicity; mu++){

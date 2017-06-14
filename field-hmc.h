@@ -86,7 +86,7 @@ inline void algebra_to_group(cps::Matrix &expiM, const cps::Matrix &M){
 }
 
 inline void get_rectangular_dagger(cps::Matrix &rec, const Field<cps::Matrix> &field,
-														const Coordinate &x, int mu){
+														const qlat::Coordinate &x, int mu){
 	// Assuming properly communicated
  	vector<int> dir; dir.reserve(5);
  	cps::Matrix rec_, m; rec_.ZeroMatrix();
@@ -152,8 +152,8 @@ inline void get_rectangular_dagger(cps::Matrix &rec, const Field<cps::Matrix> &f
 }
 
 inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &field, 
-														const Coordinate &x, int mu){
-//	Coordinate y = x;
+														const qlat::Coordinate &x, int mu){
+//	qlat::Coordinate y = x;
 //	const qlat::Vector<cps::Matrix> gx = field.get_elems_const(x);
 //	vector<qlat::Vector<cps::Matrix> > gxex(DIMN * 2);
 //	for(int alpha = 0; alpha < DIMN; alpha++){
@@ -169,7 +169,7 @@ inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &fie
 //		dagger.Dagger(gxex[mu][nu]);
 //		acc += (gx[nu] * gxex[nu][mu]) * dagger;
 //		dagger.Dagger(gxex[nu + DIMN][nu]);
-//		Coordinate z = x; z[nu]--; z[mu]++;
+//		qlat::Coordinate z = x; z[nu]--; z[mu]++;
 //		acc += dagger * (gxex[nu + DIMN][mu] * field.get_elems_const(z)[nu]);
 //	}
 //	staple.Dagger(acc);
@@ -193,7 +193,7 @@ inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &fie
 }
 
 inline void get_staple_2x1(cps::Matrix &staple, const Field<cps::Matrix> &field, 
-														const Coordinate &x, int mu){
+														const qlat::Coordinate &x, int mu){
  	vector<int> dir; dir.reserve(4);
  	cps::Matrix staple_; staple_.ZeroMatrix();
  	cps::Matrix m;
@@ -212,7 +212,7 @@ inline void get_staple_2x1(cps::Matrix &staple, const Field<cps::Matrix> &field,
 }
 
 inline void get_extended_staple_dagger(cps::Matrix &stp, const Field<cps::Matrix> &f,
-									const Coordinate &x, int mu, double c1){
+									const qlat::Coordinate &x, int mu, double c1){
 	double c0 = (1 - 8. * c1);
 	cps::Matrix m0, m1;
 	get_staple_dagger(m0, f, x, mu);
@@ -235,7 +235,7 @@ inline void rn_filling_SHA256_gaussian(std::vector<double> &xs)
 	const int chunk = xs.size() / geo.local_volume();
 #pragma omp parallel for
 	for (long index = 0; index < geo.local_volume(); index++){
-		Coordinate xl = geo.coordinate_from_index(index);
+		qlat::Coordinate xl = geo.coordinate_from_index(index);
 		RngState& rs = rf.get_elem(xl);
 		for (int i = chunk * index; i < chunk * (index + 1); ++i){
 			xs[i] = g_rand_gen(rs);
@@ -258,7 +258,7 @@ public:
 	Gauge gauge;
 };
 
-inline int is_constrained(const Coordinate &x, int mu, int mag)
+inline int is_constrained(const qlat::Coordinate &x, int mu, int mag)
 {
 	// return 0: not constrained;
 	// return 1: constrained but neither the first nor the last one 
@@ -296,7 +296,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 	if(arg.gauge.type == qlat::WILSON){
 #pragma omp parallel for
 		for(long index = 0; index < fField.geo.local_volume(); index++){
-			Coordinate x; 
+			qlat::Coordinate x; 
 			cps::Matrix mStaple1, mStaple2, mTemp;
 			x = fField.geo.coordinate_from_index(index);
 			const qlat::Vector<cps::Matrix> gx = gField.get_elems_const(x);
@@ -310,7 +310,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 				}
 				case 1:
 				case 10: {
-					Coordinate y(x); y[mu]++;
+					qlat::Coordinate y(x); y[mu]++;
 					get_staple_dagger(mStaple1, gField, x, mu);
 					get_staple_dagger(mStaple2, gField, y, mu);
 					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
@@ -336,7 +336,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 	if(arg.gauge.type == IWASAKI){
 #pragma omp parallel for
 		for(long index = 0; index < fField.geo.local_volume(); index++){
-			Coordinate x; 
+			qlat::Coordinate x; 
 			cps::Matrix mStaple1, mStaple2, mTemp;
 			x = fField.geo.coordinate_from_index(index);
 			const qlat::Vector<cps::Matrix> gx = gField.get_elems_const(x);
@@ -350,7 +350,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 				}
 				case 1:
 				case 10: {
-					Coordinate y(x); y[mu]++;
+					qlat::Coordinate y(x); y[mu]++;
 					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
 					get_extended_staple_dagger(mStaple2, gField, y, mu, arg.gauge.c1);
 					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
@@ -383,7 +383,7 @@ inline void evolve_momentum(Field<cps::Matrix> &mField,
 	assert(is_matching_geo(mField.geo, fField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
 		const qlat::Vector<cps::Matrix> fx = fField.get_elems_const(x);
 			  qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
@@ -398,13 +398,13 @@ inline void evolve_gauge_field(Field<cps::Matrix> &gField,
 	assert(is_matching_geo(mField.geo, gField.geo));
 #pragma omp parallel for
 	for(long index = 0; index < gField.geo.local_volume(); index++){
-		Coordinate x = gField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = gField.geo.coordinate_from_index(index);
 		cps::Matrix mL, mR;
 		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
 			  qlat::Vector<cps::Matrix> gx = gField.get_elems(x);
 		for(int mu = 0; mu < gField.geo.multiplicity; mu++){
 		// only works for cps::Matrix
-			Coordinate y(x); y[mu]--;
+			qlat::Coordinate y(x); y[mu]--;
 			switch(is_constrained(x, mu, arg.mag)){
 			case 0: {
 				algebra_to_group(mL, mx[mu] * dt);
@@ -555,7 +555,7 @@ inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matri
 #pragma omp barrier
 #pragma omp for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
 		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
 		for(int mu = 0; mu < DIMN; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
@@ -610,7 +610,7 @@ inline void init_momentum(Field<cps::Matrix> &mField){
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
 		qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		cps::Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
@@ -628,7 +628,7 @@ inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field){
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
-		Coordinate x = mField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
 		qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		cps::Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
@@ -640,7 +640,7 @@ inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field){
 	}}
 }
 
-inline double derivative(const Field<cps::Matrix> &gField, const Coordinate &x, int mu, int a){
+inline double derivative(const Field<cps::Matrix> &gField, const qlat::Coordinate &x, int mu, int a){
 	cps::Matrix &U = gField.get_elems_const(x)[mu];
 	cps::Matrix V_dagger; get_staple_dagger(V_dagger, gField, x, mu);
 	cps::Matrix temp = su3_generators[a] * U * V_dagger * qlat::Complex(0., 1.);
@@ -648,7 +648,7 @@ inline double derivative(const Field<cps::Matrix> &gField, const Coordinate &x, 
 }
 
 inline double derivative_Iwasaki(const Field<cps::Matrix> &gField, 
-									const Coordinate &x, int mu, int a, const Arg_chmc &arg){
+									const qlat::Coordinate &x, int mu, int a, const Arg_chmc &arg){
 	double c1 = arg.gauge.c1;
 	double c0 = 1. - 8. * c1;
 	cps::Matrix &u = gField.get_elems_const(x)[mu];
@@ -659,8 +659,8 @@ inline double derivative_Iwasaki(const Field<cps::Matrix> &gField,
 	return temp.ReTr();
 }
 
-inline double derivative_pair(const Field<cps::Matrix> &gField, const Coordinate &x, int mu, int b){
-	Coordinate y = x; y[mu]++;
+inline double derivative_pair(const Field<cps::Matrix> &gField, const qlat::Coordinate &x, int mu, int b){
+	qlat::Coordinate y = x; y[mu]++;
 	cps::Matrix &U1 = gField.get_elems_const(x)[mu];								
 	cps::Matrix &U2 = gField.get_elems_const(y)[mu];
 	cps::Matrix V1_dagger; get_staple_dagger(V1_dagger, gField, x, mu);
@@ -678,7 +678,7 @@ inline void derivative_field(Field<double> &dField, Field<cps::Matrix> &gField,
 	fetch_expanded(gField);
 #pragma omp parallel for
 	for(long index = 0; index < dField.geo.local_volume(); index++){
-		Coordinate x = dField.geo.coordinate_from_index(index);
+		qlat::Coordinate x = dField.geo.coordinate_from_index(index);
 		int spin_color_index;
 		qlat::Vector<double> dx = dField.get_elems(x);
 		for(int mu = 0; mu < DIMN; mu++){
@@ -703,7 +703,7 @@ inline double derivative_sum(Field<cps::Matrix> &gField, const Arg_chmc &arg){
 	for(int t = 0; t < gField.geo.node_site[3]; t += arg.mag){
 	for(int mu = 0; mu < DIMN; mu++){
 	for(int a = 0; a < 8; a++){
-		Coordinate coor(x, y, z, t);
+		qlat::Coordinate coor(x, y, z, t);
 		local_sum += derivative(gField, coor, mu, a);
 		count++;
 	}}}}}}
@@ -722,7 +722,7 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 
 	RngState globalRngState("By the witness of the martyrs.");
 
-	Coordinate expansion(2, 2, 2, 2);
+	qlat::Coordinate expansion(2, 2, 2, 2);
 	Geometry geoExpand1 = gFieldExt.geo; geoExpand1.resize(expansion, expansion);
 	Geometry geoLocal = gFieldExt.geo;
 	Field<cps::Matrix> gField; gField.init(geoExpand1); gField = gFieldExt;
@@ -731,7 +731,7 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 	Chart<cps::Matrix> chart;
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gauge);
 
-	Coordinate total_size_coarse;
+	qlat::Coordinate total_size_coarse;
 	for(int i = 0; i < DIMN; i++){
 		total_size_coarse[i] = geoLocal.total_site()[i] / arg.mag;
 	}
@@ -940,12 +940,12 @@ inline void update_constrain(Field<cps::Matrix> &gField, const Field<cps::Matrix
 	sync_node();
 #pragma omp parallel for
     for(long index = 0; index < gField_coarse.geo.local_volume(); index++){
-		Coordinate xC = gField_coarse.geo.coordinate_from_index(index);
-		Coordinate x = arg.mag * xC;
+		qlat::Coordinate xC = gField_coarse.geo.coordinate_from_index(index);
+		qlat::Coordinate x = arg.mag * xC;
 		qlat::Vector<cps::Matrix> pC = gField_coarse.get_elems_const(xC);
 		qlat::Vector<cps::Matrix> p = gField.get_elems(x);
 		for(int mu = 0; mu < gField_coarse.geo.multiplicity; mu++){
-			Coordinate xP = x; xP[mu]++;
+			qlat::Coordinate xP = x; xP[mu]++;
 			vector<int> cotta(arg.mag - 1, mu);
 			cps::Matrix m;
 			get_path_ordered_product(m, gField, xP, cotta);
@@ -987,7 +987,7 @@ inline void double_multigrid(Field<cps::Matrix> &gField_ext, const Arg_chmc &arg
 	assert(arg.num_trajectory > 20);
 	RngState globalRngState("By the witness of the martyrs.");
 
-	Coordinate expansion(2, 2, 2, 2);
+	qlat::Coordinate expansion(2, 2, 2, 2);
 
 	// declare fine lattice variables
 	Geometry geo_expanded = gField_ext.geo; geo_expanded.resize(expansion, expansion);
@@ -1003,7 +1003,7 @@ inline void double_multigrid(Field<cps::Matrix> &gField_ext, const Arg_chmc &arg
 	rng_field.init(rng_geo, RngState("Ich liebe dich."));
 
 	//declare coarse lattice variables
-	Coordinate total_size_coarse;
+	qlat::Coordinate total_size_coarse;
 	for(int i = 0; i < DIMN; i++){
 		total_size_coarse[i] = geo_local.total_site()[i] / arg.mag;
 	}
@@ -1021,8 +1021,8 @@ inline void double_multigrid(Field<cps::Matrix> &gField_ext, const Arg_chmc &arg
 #pragma omp parallel for
     for(long index = 0; index < geo_local_coarse.local_volume(); index++){
 		for(int mu = 0; mu < geo_local_coarse.multiplicity; mu++){
-			Coordinate xCoarse = geo_local_coarse.coordinate_from_index(index);
-			Coordinate x = arg.mag * xCoarse;
+			qlat::Coordinate xCoarse = geo_local_coarse.coordinate_from_index(index);
+			qlat::Coordinate x = arg.mag * xCoarse;
 			vector<int> cotta(arg.mag, mu);
 			get_path_ordered_product(gField_coarse.get_elems(xCoarse)[mu], gField, x, cotta);
     }}

@@ -45,7 +45,7 @@ inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg
 	vector<double> S(4);
 	vector<double> S0(4);
 	
-	Coordinate expansion(2, 2, 2, 2);
+	qlat::Coordinate expansion(2, 2, 2, 2);
 	Geometry geo = gField_ext.geo; geo.resize(expansion, expansion);
 	Field<cps::Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
 	Field<cps::Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
@@ -63,7 +63,7 @@ inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg
 
 	for(int i = 0; i < arg.num_trajectory; i++){
 		for(long index = 0; index < geo.local_volume(); index++){
-			Coordinate x = coordinate_from_index(index, geo.node_site);
+			qlat::Coordinate x = coordinate_from_index(index, geo.node_site);
 			qlat::Vector<cps::Matrix> v = gField1.get_elems(x);
 			for(int mu = 0; mu < geo.multiplicity; mu++){	
 				get_staple_dagger(P, gField1, x, mu);	
@@ -134,7 +134,7 @@ inline void demon_microcanonical(const Field<cps::Matrix> &gField_ext, const Arg
 //		p = Fopen((arg.summary_dir_stem + "/demon.dat").c_str(), "a");
 //	}
 //
-//	Coordinate expansion(2, 2, 2, 2);
+//	qlat::Coordinate expansion(2, 2, 2, 2);
 //	Geometry geo = gField_ext.geo; geo.resize(expansion, expansion);
 //	Field<cps::Matrix> gField1; gField1.init(geo); gField1 = gField_ext;
 //	Field<cps::Matrix> gField2; gField2.init(geo); gField2 = gField_ext;
