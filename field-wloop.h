@@ -23,7 +23,7 @@ using namespace cps;
 using namespace qlat;
 using namespace std;
 
-inline double wilson_loop(const Field<cps::Matrix> &f, const Coordinate &x, 
+inline double wilson_loop(const Field<cps::Matrix> &f, const qlat::Coordinate &x, 
 									const array<int, DIMN - 1> &r, int T){
 	
 	assert(T > 0);
@@ -80,7 +80,7 @@ inline double avg_wilson_loop(const Field<cps::Matrix> &f,
 #pragma omp barrier
 #pragma omp for
 		for(long index = 0; index < f.geo.local_volume(); index++){
-			Coordinate x = f.geo.coordinate_from_index(index);
+			qlat::Coordinate x = f.geo.coordinate_from_index(index);
 			vector<array<int, DIMN - 1> >::iterator it;
 			for(it = perm.begin(); it != perm.end(); it++){
 				p_local_sum += wilson_loop(f, x, *it, T);
@@ -99,7 +99,7 @@ inline double avg_wilson_loop(const Field<cps::Matrix> &f,
 }
 
 inline void get_staple_spatial(cps::Matrix &staple, const Field<cps::Matrix> &field, 
-					const Coordinate &x, const int i){
+					const qlat::Coordinate &x, const int i){
 	vector<int> dir;
 	cps::Matrix staple_; staple_.ZeroMatrix();
 	cps::Matrix m;
@@ -121,7 +121,7 @@ inline void ape_smear(Field<cps::Matrix> &f, double coeff, int num){
 	// U_i -> (1 - coeff) * U_i + (coeff / 4) * \SUM(U_i_staples)
 	
 	Geometry geo1 = f.geo;
-	Coordinate expansion(1, 1, 1, 1);
+	qlat::Coordinate expansion(1, 1, 1, 1);
 	geo1.resize(expansion, expansion);
 
 	Field<cps::Matrix> copy; copy.init(geo1, DIMN);
@@ -136,7 +136,7 @@ inline void ape_smear(Field<cps::Matrix> &f, double coeff, int num){
 		fetch_expanded_chart(copy, chart);
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
-			Coordinate x = copy.geo.coordinate_from_index(index);
+			qlat::Coordinate x = copy.geo.coordinate_from_index(index);
 			qlat::Vector<cps::Matrix> ix = incr.get_elems(x);
 			cps::Matrix m;
 			for(int i = 0; i < DIMN - 1; i++){
@@ -146,7 +146,7 @@ inline void ape_smear(Field<cps::Matrix> &f, double coeff, int num){
 	
 #pragma omp parallel for
 		for(long index = 0; index < copy.geo.local_volume(); index++){
-			Coordinate x = copy.geo.coordinate_from_index(index);
+			qlat::Coordinate x = copy.geo.coordinate_from_index(index);
 			qlat::Vector<cps::Matrix> cx = copy.get_elems(x);
 			qlat::Vector<cps::Matrix> ix = incr.get_elems(x);
 			for(int i = 0; i < DIMN - 1; i++){
