@@ -339,52 +339,56 @@ inline void export_config_nersc(const Field<cps::Matrix> &field, const string &d
 	double avgPlaq = avg_plaquette(field_cp);
 	double avgReTr = avg_real_trace(field_cp);
 
+
 	if(doesSkipThird){
 		Field<array<complex<double>, 6> > field_trunc, field_write;
 		fieldCastTruncated(field_trunc, field_cp);
 		sophisticated_make_to_order(field_write, field_trunc);
-	string crc32Hash = field_hash_crc32(field_write); 
-	
-	std::ostringstream checksumSum; 
-	checksumSum.setf(std::ios::hex, std::ios::basefield);
-	checksumSum << fieldChecksumSum32(field_write);
+		string crc32Hash = field_hash_crc32(field_write); 
 
-	if(get_id_node() == 0){
-		cout << "Node 0 open file!" << endl;
-		pExport = fopen(dir.c_str(), "w");
-		assert(pExport != NULL);
+		// Fix the Endianness problem 
+		from_big_endian_64((char*)field_write.field.data(), sizeof(array<complex<double>, 6>)*field_write.field.size());
 
-		std::ostringstream header_stream;
+		std::ostringstream checksumSum; 
+		checksumSum.setf(std::ios::hex, std::ios::basefield);
+		checksumSum << fieldChecksumSum32(field_write);
 
-		header_stream << "BEGIN_HEADER" << endl;
-		header_stream << "HDR_VERSION = 1.0" << endl;
-		if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
-		else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
-		header_stream << "DIMENSION_1 = " << field.geo.total_site()[0] << endl;
-		header_stream << "DIMENSION_2 = " << field.geo.total_site()[1] << endl;
-		header_stream << "DIMENSION_3 = " << field.geo.total_site()[2] << endl;
-		header_stream << "DIMENSION_4 = " << field.geo.total_site()[3] << endl;
-		header_stream << "CRC32HASH = " << crc32Hash << endl;
-		header_stream << "CHECKSUM = " << checksumSum.str() << endl;
-		
-		header_stream.precision(12);
-		header_stream << "LINK_TRACE = " << avgReTr << endl;
-		header_stream << "PLAQUETTE = " << avgPlaq << endl;
-		header_stream << "CREATOR = RBC" << endl;
-		time_t now = std::time(NULL);	
-		header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
-		header_stream << "ENSEMBLE_LABEL = " << arg.ensemble_label << endl;
-		header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
-		header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
-		header_stream << "SEQUENCE_NUMBER = " << arg.sequence_num << endl;
-		header_stream << "BETA = " << arg.beta << endl; 
-		header_stream << "END_HEADER" << endl;
+		if(get_id_node() == 0){
+			cout << "Node 0 open file!" << endl;
+			pExport = fopen(dir.c_str(), "w");
+			assert(pExport != NULL);
 
-		fputs(header_stream.str().c_str(), pExport);
-		fclose(pExport);
-	}
+			std::ostringstream header_stream;
 
-	sophisticated_serial_write(field_write, dir, true);
+			header_stream << "BEGIN_HEADER" << endl;
+			header_stream << "HDR_VERSION = 1.0" << endl;
+			if(doesSkipThird) header_stream << "DATATYPE = 4D_SU3_GAUGE" << endl;
+			else header_stream << "DATATYPE = 4D_SU3_GAUGE_3x3" << endl;
+			header_stream << "DIMENSION_1 = " << field.geo.total_site()[0] << endl;
+			header_stream << "DIMENSION_2 = " << field.geo.total_site()[1] << endl;
+			header_stream << "DIMENSION_3 = " << field.geo.total_site()[2] << endl;
+			header_stream << "DIMENSION_4 = " << field.geo.total_site()[3] << endl;
+			header_stream << "CRC32HASH = " << crc32Hash << endl;
+			header_stream << "CHECKSUM = " << checksumSum.str() << endl;
+
+			header_stream.precision(12);
+			header_stream << "LINK_TRACE = " << avgReTr << endl;
+			header_stream << "PLAQUETTE = " << avgPlaq << endl;
+			header_stream << "CREATOR = RBC" << endl;
+			time_t now = std::time(NULL);	
+			header_stream << "ARCHIVE_DATE = " << std::ctime(&now);
+			header_stream << "ENSEMBLE_LABEL = " << arg.ensemble_label << endl;
+			header_stream << "FLOATING_POINT = IEEE64BIG" << endl;
+			header_stream << "ENSEMBLE_ID = NOT yet implemented" << endl;
+			header_stream << "SEQUENCE_NUMBER = " << arg.sequence_num << endl;
+			header_stream << "BETA = " << arg.beta << endl; 
+			header_stream << "END_HEADER" << endl;
+
+			fputs(header_stream.str().c_str(), pExport);
+			fclose(pExport);
+		}
+
+		sophisticated_serial_write(field_write, dir, true);
 
 	}else{
 		Field<cps::Matrix> field_write;
@@ -394,6 +398,9 @@ inline void export_config_nersc(const Field<cps::Matrix> &field, const string &d
 		std::ostringstream checksumSum; 
 		checksumSum.setf(std::ios::hex, std::ios::basefield);
 		checksumSum << fieldChecksumSum32(field_write);
+	
+		// Fix the Endianness problem 
+		from_big_endian_64((char*)field_write.field.data(), sizeof(cps::Matrix)*field_write.field.size());
 
 		if(get_id_node() == 0){
 			cout << "Node 0 open file!" << endl;
