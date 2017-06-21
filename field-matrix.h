@@ -80,7 +80,12 @@ inline double reunitarize(Field<cps::Matrix> &field){
                 for(int mu = 0; mu < field.geo.multiplicity; mu++){
 			cps::Matrix &newElem = field.get_elems(x)[mu];
 			oldElem = newElem;
-			newElem.Unitarize();
+			bool all_zero = true;
+			for(int i = 0; i < 12; i++){
+				all_zero = all_zero && (0. == newElem.elem(i));
+			}
+			if(!all_zero) newElem.Unitarize();
+			// if the first two lines are exactly zero, don't unitarize.
 			maxDev = max(maxDev, qlat::norm(newElem - oldElem));
 	}}
 	return maxDev;
@@ -130,6 +135,28 @@ inline double get_plaq(const Field<cps::Matrix> &f, const qlat::Coordinate &x){
 	cps::Matrix m, n;
 	double ret = 0.;
 	for(int mu = 0; mu < DIMN; mu++){
+	for(int nu = 0; nu < mu; nu++){
+		m = gx[mu] * gxex[mu][nu];
+		n.Dagger(gx[nu] * gxex[nu][mu]);
+		ret += (m * n).ReTr();
+	}}
+	return ret;
+}
+
+inline double get_plaq_tslice(const Field<cps::Matrix> &f, const qlat::Coordinate &x){
+	// same but only computing plaq in space direction.
+	// assuming properly communicated.
+	
+	const qlat::Vector<cps::Matrix> gx = f.get_elems_const(x);
+	vector<qlat::Vector<cps::Matrix> > gxex(DIMN-1);
+	qlat::Coordinate y;
+	for(int mu = 0; mu < DIMN-1; mu++){
+		y = x; y[mu]++;
+		gxex[mu] = f.get_elems_const(y);
+	}
+	cps::Matrix m, n;
+	double ret = 0.;
+	for(int mu = 0; mu < DIMN-1; mu++){
 	for(int nu = 0; nu < mu; nu++){
 		m = gx[mu] * gxex[mu][nu];
 		n.Dagger(gx[nu] * gxex[nu][mu]);
@@ -223,6 +250,28 @@ inline double total_plaq(const qlat::Field<cps::Matrix> &f){
 	MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
 
 	return global_sum;
+}
+
+inline double avg_plaq_tslice(const qlat::Field<cps::Matrix> &f, int glb_t){
+	// assuming properly communicated.
+	TIMER("total_plaq()");
+	double local_sum = 0.;
+	int num_threads;
+	vector<double> pp_local_sum;
+
+	double p_local_sum = 0.;
+	for(long index = 0; index < f.geo.local_volume(); index++){
+		qlat::Coordinate x = f.geo.coordinate_from_index(index);
+		Coordinate g_x = f.geo.coordinate_g_from_l(x);
+		if(g_x[DIMN-1] == glb_t){
+			p_local_sum += get_plaq_tslice(f, x);
+		}
+	}
+
+	double global_sum;
+	MPI_Allreduce(&p_local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
+
+	return global_sum / (9. * get_num_node() * f.geo.local_volume() / f.geo.total_site()[DIMN-1]);
 }
 
 inline double total_rectangular(const qlat::Field<cps::Matrix> &f){
