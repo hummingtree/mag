@@ -116,6 +116,225 @@ inline cps::Matrix compute_Lambda(const cps::Matrix& Q, const cps::Matrix& Sigma
 	return hermitian_traceless(Gamma);
 }
 
+inline double get_kinetic_energy(Field<cps::Matrix>& mField){
+
+	double localSum = 0.; // local sum of Tr(\pi*\pi^\dagger)
+	int numThreads;
+	vector<double> ppLocalSum;
+
+#pragma omp parallel
+{
+	if(omp_get_thread_num() == 0){
+		numThreads = omp_get_num_threads();
+		ppLocalSum.resize(numThreads);
+	}
+	double pLocalSum = 0.;
+#pragma omp barrier
+#pragma omp for
+	for(long index = 0; index < mField.geo.local_volume(); index++){
+		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
+		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
+		for(int mu = 0; mu < DIMN; mu++){
+			pLocalSum += (mx[mu] * mx[mu]).ReTr();
+	}}
+	ppLocalSum[omp_get_thread_num()] = pLocalSum;
+}
+	for(int i = 0; i < numThreads; i++){
+		localSum += ppLocalSum[i];
+	}
+
+	double globalSum;
+	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
+	return globalSum / 2.;
+}
+
+inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& CgField){
+	static const eta_sqr = 1.*1.;
+	
+	double localSum = 0.; // local sum of Tr(\pi*\pi^\dagger)
+	int numThreads;
+	vector<double> ppLocalSum;
+
+#pragma omp parallel
+{
+	if(omp_get_thread_num() == 0){
+		numThreads = omp_get_num_threads();
+		ppLocalSum.resize(numThreads);
+	}
+	double pLocalSum = 0.;
+#pragma omp barrier
+#pragma omp for
+	for(long index = 0; index < CgField.geo.local_volume(); index++){
+		qlat::Coordinate x = CgField.geo.coordinate_from_index(index);
+		const qlat::Vector<cps::Matrix> mx = CgField.get_elems_const(x);
+		for(int mu = 0; mu < DIMN; mu++){
+			// The actaul work
+			// first compute Q.
+			cps::Matrix Q = get_Q(FgField, 2*x, mu, -0.3);
+			cps::Matrix Gb = expiQ(Q)*getU(FgField, 2*x, mu) 
+			cps::Matrix Ucd; Ucd.Dagger(mx[mu]);
+			pLocalSum += (Ucd*Gb).ReTr()/eta_sqr;
+	}}
+	ppLocalSum[omp_get_thread_num()] = pLocalSum;
+}
+	for(int i = 0; i < numThreads; i++){
+		localSum += ppLocalSum[i];
+	}
+
+	double globalSum;
+	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
+	return globalSum;
+}
+
+inline double get_hamiltonian_multi(
+	Field<cps::Matrix>& FgField, 
+	Field<cps::Matrix>& FmField, 
+	const Arg_chmc& Farg, 
+	Chart<cps::Matrix>& Fchart, 
+	Field<cps::Matrix>& CgField, 
+	Field<cps::Matrix>& CmField, 
+	Field<cps::Matrix>& Cchart, 
+	vector<double>& part
+){
+	TIMER("get_hamiltonian_multi()");
+	
+	// momentum part
+	double kinetic_energy = get_kinetic_energy(FmField) + get_kinetic_energy(CmField);
+
+	// original fine action
+	fetch_expanded_chart(gField, chart);
+	double potential_energy;
+	if(Farg.gauge.type == qlat::WILSON){
+		potential_energy = -total_plaq(FgField) * Farg.beta / 3.;
+	}
+	if(Farg.gauge.type == IWASAKI){
+		double p1 = -total_plaq(gField);
+		double p2 = -total_rectangular(gField);
+		potential_energy = (p1*(1.-8.*Farg.gauge.c1) + p2*Farg.gauge.c1) * arg.beta / 3.;
+	}
+
+	// eta part
+	double eta_energy;
+	eta_energy = get_eta_energy(FgField, CgField);
+
+	// summing
+	part.resize(3);
+	part[0] = kinetic_energy;
+	part[1] = potential_energy;
+	part[2] = eta_energy;
+	return kinetic_energy + potential_energy + eta_energy;
+}
+
+inline int stout_type(qlat::Coordinate& x, int mu){
+	// return 0, 1, 2, 3, 4 for different stout types.
+	
+}
+
+inline void get_Fforce(
+    Field<cps::Matrix>& FfField,
+    Field<cps::Matrix>& FgField,
+    Field<cps::Matrix>& CgField,
+    Arg_chmc& Farg
+){
+	// TODO!!!
+	// HUGE amount of work need to be done.
+	
+	TIMER("get_Fforce()");
+	assert(is_matching_geo(fField.geo, gField.geo));
+
+	// first repeat the usual gauge force.
+	if(Farg.gauge.type == qlat::WILSON){
+#pragma omp parallel for
+		for(long index = 0; index < FfField.geo.local_volume(); index++){
+			qlat::Coordinate x; 
+			cps::Matrix mStaple1, mStaple2, mTemp;
+			x = fField.geo.coordinate_from_index(index);
+			const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
+			qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
+			for(int mu = 0; mu < FfField.geo.multiplicity; mu++){
+				get_staple_dagger(mStaple1, FgField, x, mu);
+				mTemp = gx[mu] * mStaple1;
+				mTemp.TrLessAntiHermMatrix(); 
+				fx[mu] = mTemp * qlat::Complex(0., Farg.beta / 3.);
+		}}
+	}
+	if(arg.gauge.type == IWASAKI){
+#pragma omp parallel for
+		for(long index = 0; index < FfField.geo.local_volume(); index++){
+			qlat::Coordinate x; 
+			cps::Matrix mStaple1, mStaple2, mTemp;
+			x = FfField.geo.coordinate_from_index(index);
+			const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
+			qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
+			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
+				get_extended_staple_dagger(mStaple1, gField, x, mu, Farg.gauge.c1);
+				mTemp = gx[mu] * mStaple1;
+				mTemp.TrLessAntiHermMatrix(); 
+				fx[mu] = mTemp * qlat::Complex(0., Farg.beta / 3.);
+		}}
+	
+	}
+
+	// Now add the nasty stout part.
+#pragma omp parallel for
+	for(long index = 0; index < FfField.geo.local_volume(); index++){
+		qlat::Coordinate x; 
+		cps::Matrix mStaple1, mStaple2, mTemp;
+		x = FfField.geo.coordinate_from_index(index);
+		const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
+		qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
+		for(int mu = 0; mu < fField.geo.multiplicity; mu++){
+			switch(stout_type(x, mu)){
+				case 1: {
+					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
+					mTemp = gx[mu] * mStaple1;
+					break;
+				}
+				case 2:
+				case 3: {
+					qlat::Coordinate y(x); y[mu]++;
+					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
+					get_extended_staple_dagger(mStaple2, gField, y, mu, arg.gauge.c1);
+					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
+					break;
+				}
+				case 3: mTemp.ZeroMatrix(); break;
+			 	default: assert(false);
+			}	
+			get_extended_staple_dagger(mStaple1, gField, x, mu, Farg.gauge.c1);
+			mTemp = gx[mu] * mStaple1;
+			mTemp.TrLessAntiHermMatrix(); 
+			fx[mu] = mTemp * qlat::Complex(0., Farg.beta / 3.);
+	}}
+
+}
+
+inline void get_Cforce(
+	Field<cps::Matrix>& CfField,
+	Field<cps::Matrix>& FgField,
+	Field<cps::Matrix>& CgField,
+	Arg_chmc& Farg
+){
+	static const eta_sqr = 1.*1.;
+	TIMER("get_Cforce()");
+	assert(is_matching_geo(CfField.geo, Cgield.geo));
+
+#pragma omp parallel for
+	for(long index = 0; index < CfField.geo.local_volume(); index++){
+		qlat::Coordinate x; x = CfField.geo.coordinate_from_index(index);
+		cps::Matrix Q, Gbd, mTemp;
+		const qlat::Vector<cps::Matrix> gx = CgField.get_elems_const(x);
+		qlat::Vector<cps::Matrix> fx = CfField.get_elems(x);
+		for(int mu = 0; mu < FfField.geo.multiplicity; mu++){
+			// actual work!
+			Q = get_Q(FgField, 2*x, mu, -0.3);
+			Gdb.Dagger( expiQ(Q)*getU(FgField, 2*x, mu) ); 		
+			mTemp = gx[mu]*Gbd;
+			mTemp.TrLessAntiHermMatrix(); 
+			fx[mu] = mTemp*qlat::Complex(0., -1./eta_sqr);
+	}}
+}
+
 inline void force_gradient_integrator_multi(
 	Field<cps::Matrix>& FgField, Field<cps::Matrix>& FmField, 
 	Field<cps::Matrix>& FgFieldAuxil, Field<cps::Matrix>& FfField,
