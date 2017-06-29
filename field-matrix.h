@@ -173,6 +173,31 @@ inline void get_path_ordered_product(cps::Matrix &prod, const Field<cps::Matrix>
 	prod = mul;
 }
 
+inline cps::Matrix get_path_ordered_product_insertion(const Field<cps::Matrix> &field, 
+					const qlat::Coordinate &x, const vector<int> &dir, cps::Matrix& ins){
+	// assuming properly communicated.
+	
+	cps::Matrix mul; mul.UnitMatrix();
+	cps::Matrix dag;
+	qlat::Coordinate y(x);
+	int direction;
+	for(unsigned int i = 0; i < dir.size(); i++){
+		direction = dir[i];
+		assert(direction < DIMN * 2 && direction > -2);
+		if(direction == -1){
+			mul = mul * ins;
+		}else if(direction < DIMN){
+			mul = mul * field.get_elems_const(y)[direction];
+			y[direction]++;
+		}else{
+			y[direction - DIMN]--;
+			dag.Dagger(field.get_elems_const(y)[direction - DIMN]);
+			mul = mul * dag;
+		}
+	}
+	return mul;
+}
+
 inline double get_plaq(const Field<cps::Matrix> &f, const qlat::Coordinate &x){
 	// assuming properly communicated.
 	

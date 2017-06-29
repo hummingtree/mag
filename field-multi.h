@@ -24,18 +24,26 @@ using namespace std;
 
 QLAT_START_NAMESPACE
 
+static const double rho = -0.3;
+static const double eta_sqr = 1.*1.;
+
 // notations follow hep-lat/0311018
 inline cps::Matrix get_U(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu){
 	cps::Coordinate y = x; y[mu]++;
 	return fine_gField.get_elems(x)[mu] * fine_gField.get_elems(y)[mu];
 }
 
-inline cps::Matrix get_Q(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu, double rho){
+inline cps::Matrix get_Q(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu, double rho_){
 	// assuming properly communicated.
 	cps::Matrix stp;
 	get_staple_2x1(stp, fine_gField, x, mu);
 	cps::Matrix dg; dg.Dagger(get_U(fine_gField, x, mu));
-	return rho*dg*stp;
+	return rho_*dg*stp;
+}
+
+inline cps::Matrix dagger(const cps::Matrix& M){
+	cps::Matrix rtn; rtn.Dagger(M);
+	return rtn;
 }
 
 inline cps::Matrix hermitian_traceless(const cps::Matrix& M){
@@ -149,7 +157,6 @@ inline double get_kinetic_energy(Field<cps::Matrix>& mField){
 }
 
 inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& CgField){
-	static const eta_sqr = 1.*1.;
 	
 	double localSum = 0.; // local sum of Tr(\pi*\pi^\dagger)
 	int numThreads;
@@ -170,8 +177,8 @@ inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& Cg
 		for(int mu = 0; mu < DIMN; mu++){
 			// The actaul work
 			// first compute Q.
-			cps::Matrix Q = get_Q(FgField, 2*x, mu, -0.3);
-			cps::Matrix Gb = expiQ(Q)*getU(FgField, 2*x, mu) 
+			cps::Matrix Q = get_Q(FgField, 2*x, mu, rho);
+			cps::Matrix Gb = expiQ(Q)*getU(FgField, 2*x, mu); 
 			cps::Matrix Ucd; Ucd.Dagger(mx[mu]);
 			pLocalSum += (Ucd*Gb).ReTr()/eta_sqr;
 	}}
@@ -225,9 +232,30 @@ inline double get_hamiltonian_multi(
 	return kinetic_energy + potential_energy + eta_energy;
 }
 
-inline int stout_type(qlat::Coordinate& x, int mu){
+inline vector<int> count_num_odd(const qlat::Coordinate& x){
+	vector<int> rtn;
+	for(int i = 0; i < DIMN; i++){
+		if(x[i] % 2 == 1);
+		rtn.push_back(i);
+	}
+	return rtn;
+}
+
+inline array<int, 2> stout_type(qlat::Coordinate& x, int mu){
 	// return 0, 1, 2, 3, 4 for different stout types.
-	
+	vector<int> cnt = count_num_odd(x);
+	if(cnt.size() == 0){
+		return array<int, 2>{1, 0}; // type 1
+	}else if(cnt.size() == 1){
+		if(cnt[0] == mu) return array<int, 2>{3, 0}; // type 3
+		else return array<int, 2>{2, cnt[0]}; // type 2
+	}else if(cnt.size() == 2){
+		if(cnt[0] == mu) return array<int, 2>{4, cnt[1]}; // type 4
+		if(cnt[1] == mu) return array<int, 2>{4, cnt[0]};
+		return array<int, 2>{0, 0};
+	}else{
+		return array<int, 2>{0, 0};
+	}
 }
 
 inline void get_Fforce(
@@ -246,9 +274,8 @@ inline void get_Fforce(
 	if(Farg.gauge.type == qlat::WILSON){
 #pragma omp parallel for
 		for(long index = 0; index < FfField.geo.local_volume(); index++){
-			qlat::Coordinate x; 
+			qlat::Coordinate x; x = FfField.geo.coordinate_from_index(index);
 			cps::Matrix mStaple1, mStaple2, mTemp;
-			x = fField.geo.coordinate_from_index(index);
 			const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
 			qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
 			for(int mu = 0; mu < FfField.geo.multiplicity; mu++){
@@ -261,9 +288,8 @@ inline void get_Fforce(
 	if(arg.gauge.type == IWASAKI){
 #pragma omp parallel for
 		for(long index = 0; index < FfField.geo.local_volume(); index++){
-			qlat::Coordinate x; 
+			qlat::Coordinate x; x = FfField.geo.coordinate_from_index(index);
 			cps::Matrix mStaple1, mStaple2, mTemp;
-			x = FfField.geo.coordinate_from_index(index);
 			const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
 			qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
 			for(int mu = 0; mu < fField.geo.multiplicity; mu++){
@@ -276,35 +302,203 @@ inline void get_Fforce(
 	}
 
 	// Now add the nasty stout part.
+	
+	// first evaulate the Lambda field
+	Field<cps::Matrix> ClField; ClField.init(CgField.geo); 
+	// assuming CgField.geo has expansion available for communication.	
+
+#pragma omp parallel for
+	for(long index = 0; index < ClField.geo.local_volume(); index++){
+		qlat::Coordinate x; x = ClField.geo.coordinate_from_index(index);
+		cps::Matrix mStaple1, mStaple2, mTemp;
+		for(int mu = 0; mu < ClField.geo.multiplicity; mu++){
+			cps::Matrix Q = get_Q(FgField, 2*x, mu, rho);
+			cps::Matrix SigmaP = CgField.get_elems(x)[mu];
+			ClField.get_elems(x)[mu] = compute_Lambda(Q, SigmaP, getU(FgField, 2*x, mu));
+	}}
+	fetch_expanded(ClField);
+
 #pragma omp parallel for
 	for(long index = 0; index < FfField.geo.local_volume(); index++){
 		qlat::Coordinate x; 
-		cps::Matrix mStaple1, mStaple2, mTemp;
+		cps::Matrix mStaple1, mStaple2, mTemp; mTemp.ZeroMatrix();
 		x = FfField.geo.coordinate_from_index(index);
 		const qlat::Vector<cps::Matrix> gx = FgField.get_elems_const(x);
 		qlat::Vector<cps::Matrix> fx = FfField.get_elems(x);
-		for(int mu = 0; mu < fField.geo.multiplicity; mu++){
-			switch(stout_type(x, mu)){
-				case 1: {
-					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
-					mTemp = gx[mu] * mStaple1;
+		for(int mu = 0; mu < FfField.geo.multiplicity; mu++){
+			vector<int> directions(6);
+			qlat::Coordinate y; // insertion pos
+			qlat::Coordinate s; // starting pos
+			array<int, 2> type_num = stout_type(x, mu);
+			switch(type_num[0]){
+				case 1:{
+					y = x; y[mu]++;
+					mTemp += FgField.get_elems(y)[mu]
+							*dagger(CgField.get_elems(x/2)[mu])
+							*expiQ(get_Q(FgField, x, mu, rho));
+
+					for(int nu = 0; nu < DIMN; nu++){
+						if(nu == mu) continue;
+						
+						y = x;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = mu;
+						directions[1] = nu;
+						directions[2] = mu+DIMN;
+						directions[3] = mu+DIMN;
+						directions[4] = nu+DIMN;
+						directions[5] = -1;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+						
+						y = x;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = mu;
+						directions[1] = nu+DIMN;
+						directions[2] = mu+DIMN;
+						directions[3] = mu+DIMN;
+						directions[4] = nu;
+						directions[5] = -1;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+						
+						y = x;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = nu;
+						directions[1] = nu;
+						directions[2] = mu+DIMN;
+						directions[3] = nu+DIMN;
+						directions[4] = nu+DIMN;
+						directions[5] = -1;
+						mTemp += -rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					
+						y = x; y[nu] += -2;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = nu+DIMN;
+						directions[1] = nu+DIMN;
+						directions[2] = mu+DIMN;
+						directions[3] = -1;
+						directions[4] = nu;
+						directions[5] = nu;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					}
+
 					break;
 				}
-				case 2:
-				case 3: {
-					qlat::Coordinate y(x); y[mu]++;
-					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
-					get_extended_staple_dagger(mStaple2, gField, y, mu, arg.gauge.c1);
-					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
+				case 2:{
+					y = x; y[type_num[1]]--;
+					cps::Matrix ins = ClField.get_elems(y/2)[mu];
+					s = x; s[mu]++;
+					directions[0] = mu;
+					directions[1] = type_num[1]+DIMN;
+					directions[2] = mu+DIMN;
+					directions[3] = mu+DIMN;
+					directions[4] = -1;
+					directions[5] = type_num[1];
+					mTemp += -rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+				
+					y = x; y[type_num[1]]++;
+					ins = ClField.get_elems(y/2)[mu];
+					s = x; s[mu]++;
+					directions[0] = mu;
+					directions[1] = type_num[1];
+					directions[2] = mu+DIMN;
+					directions[3] = mu+DIMN;
+					directions[4] = -1;
+					directions[5] = type_num[1]+DIMN;
+					mTemp += -rho*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					
 					break;
 				}
-				case 3: mTemp.ZeroMatrix(); break;
-			 	default: assert(false);
-			}	
-			get_extended_staple_dagger(mStaple1, gField, x, mu, Farg.gauge.c1);
-			mTemp = gx[mu] * mStaple1;
+				case 3:{
+					y = x; y[mu]--;
+					mTemp += dagger(CgField.get_elems(y/2)[mu])
+							*expiQ(get_Q(FgField, y, mu, rho));
+							*FgField.get_elems(y)[mu];
+					for(int nu = 0; nu < DIMN; nu++){
+						if(nu == mu) continue;
+						
+						y = x; y[mu]--;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = nu;
+						directions[1] = mu+DIMN;
+						directions[2] = mu+DIMN;
+						directions[3] = nu+DIMN;
+						directions[4] = -1;
+						directions[5] = mu;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					
+						y = x; y[mu]--;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = nu+DIMN;
+						directions[1] = mu+DIMN;
+						directions[2] = mu+DIMN;
+						directions[3] = nu;
+						directions[4] = -1;
+						directions[5] = mu;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					
+						y = x; y[mu]++;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = -1;
+						directions[1] = nu;
+						directions[2] = nu;
+						directions[3] = mu+DIMN;
+						directions[4] = nu+DIMN;
+						directions[5] = nu+DIMN;
+						mTemp += +rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					
+						y = x; y[mu]++; y[nu] += -2;
+						cps::Matrix ins = ClField.get_elems(y/2)[mu];
+						s = x; s[mu]++;
+						directions[0] = nu+DIMN;
+						directions[1] = nu+DIMN;
+						directions[2] = -1;
+						directions[3] = mu+DIMN;
+						directions[4] = nu;
+						directions[5] = nu;
+						mTemp += -rho.*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+					}
+
+					break;
+				}
+				case 4:{
+					y = x; y[type_num[1]]--; y[mu]--; // y-\nu-\mu
+					cps::Matrix ins = ClField.get_elems(y/2)[mu];
+					s = x; s[mu]++; // y+\mu
+					directions[0] = type_num[1]+DIMN;
+					directions[1] = mu+DIMN;
+					directions[2] = mu+DIMN;
+					directions[3] = -1;
+					directions[4] = type_num[1];
+					directions[5] = mu;
+					mTemp += -rho*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+				
+					y = x; y[type_num[1]]++; y[mu]--; // y+\nu+\mu
+					ins = ClField.get_elems(y/2)[mu]; 
+					s = x; s[mu]++; // y+\mu
+					directions[0] = type_num[1];
+					directions[1] = mu+DIMN;
+					directions[2] = mu+DIMN;
+					directions[3] = -1;
+					directions[4] = type_num[1]+DIMN;
+					directions[5] = mu;
+					mTemp += -rho*i()*get_path_ordered_product_insertion(FgField, s, directions, ins);
+	
+					break;
+				}
+				case 0:{
+					break; // do nothing
+				}
+				default: assert(false);
+			}
 			mTemp.TrLessAntiHermMatrix(); 
-			fx[mu] = mTemp * qlat::Complex(0., Farg.beta / 3.);
+			fx[mu] += -i()*mTemp;
 	}}
 
 }
@@ -315,7 +509,6 @@ inline void get_Cforce(
 	Field<cps::Matrix>& CgField,
 	Arg_chmc& Farg
 ){
-	static const eta_sqr = 1.*1.;
 	TIMER("get_Cforce()");
 	assert(is_matching_geo(CfField.geo, Cgield.geo));
 
@@ -327,7 +520,7 @@ inline void get_Cforce(
 		qlat::Vector<cps::Matrix> fx = CfField.get_elems(x);
 		for(int mu = 0; mu < FfField.geo.multiplicity; mu++){
 			// actual work!
-			Q = get_Q(FgField, 2*x, mu, -0.3);
+			Q = get_Q(FgField, 2*x, mu, rho);
 			Gdb.Dagger( expiQ(Q)*getU(FgField, 2*x, mu) ); 		
 			mTemp = gx[mu]*Gbd;
 			mTemp.TrLessAntiHermMatrix(); 
