@@ -36,7 +36,7 @@ inline cps::Matrix get_U(Field<cps::Matrix>& fine_gField, const qlat::Coordinate
 inline cps::Matrix get_Q(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu, double rho_){
 	// assuming properly communicated.
 	cps::Matrix stp = get_staple_rect(fine_gField, x, mu);
-	// qlat::Printf("stp = %.12e\n", (stp*stp).ReTr());
+	qlat::Printf("stp = %.12e\n", (stp).ReTr());
 	cps::Matrix dg; dg.Dagger(get_U(fine_gField, x, mu));
 	cps::Matrix Omega = stp * dg; Omega.TrLessAntiHermMatrix();
 	// qlat::Printf("%.12e\n", (Omega*Omega).ReTr());

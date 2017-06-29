@@ -91,8 +91,6 @@ inline cps::Matrix expiQ(const cps::Matrix& Q){
 	double u = sqrt(c1/3.) * cos(theta/3.);
 	double w = sqrt(c1) * sin(theta/3.);
 
-	// qlat::Printf("u=%.12f\tw=%.12f\n", u, w);	
-
 	double xi0;
 	if(w*w < 0.05*0.05) xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
 	else xi0 = sin(w)/w;
