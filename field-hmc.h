@@ -192,23 +192,22 @@ inline void get_staple_dagger(cps::Matrix &staple, const Field<cps::Matrix> &fie
 
 }
 
-inline void get_staple_2x1(cps::Matrix &staple, const Field<cps::Matrix> &field, 
-														const qlat::Coordinate &x, int mu){
+inline cps::Matrix get_staple_rect(const Field<cps::Matrix> &field, const qlat::Coordinate &x, int mu){
  	vector<int> dir; dir.reserve(4);
- 	cps::Matrix staple_; staple_.ZeroMatrix();
+ 	cps::Matrix staple; staple.ZeroMatrix();
  	cps::Matrix m;
  	for(int nu = 0; nu < DIMN; nu++){
  		if(mu == nu) continue;
  		dir.clear();
  		dir.push_back(nu); dir.push_back(mu); dir.push_back(mu); dir.push_back(nu + DIMN);
  		get_path_ordered_product(m, field, x, dir);
- 		staple_ += m;
+ 		staple += m;
  		dir.clear();
  		dir.push_back(nu + DIMN); dir.push_back(mu); dir.push_back(mu); dir.push_back(nu);
  		get_path_ordered_product(m, field, x, dir);
- 		staple_ += m;
+ 		staple += m;
  	}
- 	staple = staple_;
+	return staple;
 }
 
 inline void get_extended_staple_dagger(cps::Matrix &stp, const Field<cps::Matrix> &f,
