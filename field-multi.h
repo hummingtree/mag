@@ -88,11 +88,28 @@ inline cps::Matrix compute_Lambda(const cps::Matrix& Q, const cps::Matrix& Sigma
 	qlat::Complex f1 = h1 / (9.*u*u-w*w);
 	qlat::Complex f2 = h2 / (9.*u*u-w*w);
 
-	qlat::Complex r01 = 2.*(u+i()*(u*u-w*w))*expix(2.*u)+2.*expix(-u)*(4.*u*(2.-i()*u)*cos(w)+i()*xi0*(9.*u*u+w*w-i()*u*(3.*u*u+w*w)));
-	qlat::Complex r11 = 2.*(1.+2.*i()*u)*expix(2.*u) + expix(-u)*( -2.*(1.-i()*u)*cos(w) + i()*xi0*(6.*u+i()*(w*w-3.*u*u)) );
-	qlat::Complex r21 = 2.*i()*expix(2.*u)+i()*expix(-u)*( cos(w)-3.*xi0*(1.-i()*u) );
-	qlat::Complex r02 = -2.*expix(2.*u) + 2.*i()*u*expix(-u)*( cos(w) + (1.+4.*i()*u)*xi0 + 3.*u*u*xi1 );
-	qlat::Complex r12 = -i()*expix(-u) * ( cos(w) + (1.+2.*i()*u)*xi0 - 3.*u*u*xi1 );
+	qlat::Complex r01 = 2.*( u + i()*(u*u-w*w) ) * expix(2.*u) + 
+						2.*expix(-u)*( 
+										4.*u*(2.-i()*u)*cos(w) + 
+										i()*xi0*( 9.*u*u + w*w - i()*u*(3.*u*u+w*w) )
+						);
+
+	qlat::Complex r11 = 2.*( 1.+2.*i()*u ) * expix(2.*u) + 
+						expix(-u)*( 
+									-2.*(1.-i()*u)*cos(w) + 
+									i()*xi0*(6.*u+i()*(w*w-3.*u*u)) 
+						);
+
+	qlat::Complex r21 = 2.*i()*expix(2.*u) + 
+						i()*expix(-u)*( cos(w)-3.*xi0*(1.-i()*u) );
+
+	qlat::Complex r02 = -2.*expix(2.*u) + 
+						2.*i()*u*expix(-u)*( cos(w) + (1.+4.*i()*u)*xi0 + 3.*u*u*xi1 );
+	qlat::Complex r12 = -i()*expix(-u) * ( 
+											cos(w) 
+											+ (1.+2.*i()*u)*xi0 
+											- 3.*u*u*xi1 
+						);
 	qlat::Complex r22 = expix(-u) * (xi0 - 3.*i()*u*xi1);
 
 	qlat::Complex b10 = (2.*u*r01 + (3.*u*u-w*w)*r02 - 2.*(15.*u*u+w*w)*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
@@ -397,7 +414,7 @@ inline void get_Fforce(
 						directions[3] = -1;
 						directions[4] = nu;
 						directions[5] = nu;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
 					}
 
 					break;
