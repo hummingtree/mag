@@ -36,7 +36,6 @@ inline cps::Matrix get_U(Field<cps::Matrix>& fine_gField, const qlat::Coordinate
 inline cps::Matrix get_Q(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu, double rho_){
 	// assuming properly communicated.
 	cps::Matrix stp = get_staple_rect(fine_gField, x, mu);
-	qlat::Printf("stp = %.12e\n", (stp).ReTr());
 	cps::Matrix dg; dg.Dagger(get_U(fine_gField, x, mu));
 	cps::Matrix Omega = stp * dg; Omega.TrLessAntiHermMatrix();
 	// qlat::Printf("%.12e\n", (Omega*Omega).ReTr());
@@ -100,9 +99,9 @@ inline cps::Matrix compute_Lambda(const cps::Matrix& Q, const cps::Matrix& Sigma
 	qlat::Complex b11 = (2.*u*r11 + (3.*u*u-w*w)*r12 - 2.*(15.*u*u+w*w)*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
 	qlat::Complex b12 = (2.*u*r21 + (3.*u*u-w*w)*r22 - 2.*(15.*u*u+w*w)*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
 
-	qlat::Complex b20 = (r01 + 3.*u*r02 - 24.*u*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b21 = (r11 + 3.*u*r12 - 24.*u*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b22 = (r21 + 3.*u*r22 - 24.*u*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b20 = (r01 - 3.*u*r02 - 24.*u*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b21 = (r11 - 3.*u*r12 - 24.*u*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b22 = (r21 - 3.*u*r22 - 24.*u*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
 
 	if(reflect){
 		f0 = conj(f0);
@@ -321,7 +320,7 @@ inline void get_Fforce(
 		cps::Matrix mStaple1, mStaple2, mTemp;
 		for(int mu = 0; mu < ClField.geo.multiplicity; mu++){
 			cps::Matrix Q = get_Q(FgField, 2*x, mu, rho);
-			cps::Matrix SigmaP = CgField.get_elems(x)[mu];
+			cps::Matrix SigmaP = dagger(CgField.get_elems(x)[mu]);
 			ClField.get_elems(x)[mu] = compute_Lambda(Q, SigmaP, get_U(FgField, 2*x, mu));
 			// qlat::Printf("%.12f\n", ClField.get_elems(x)[mu]);
 	}}
@@ -341,6 +340,7 @@ inline void get_Fforce(
 			qlat::Coordinate s; // starting pos
 			cps::Matrix ins; // insertion matrix
 			array<int, 2> type_num = stout_type(x, mu);
+//			qlat::Printf("Type %d-%d:(%d,%d,%d,%d)%d\n", type_num[0], type_num[1], x[0],x[1],x[2],x[3],mu);
 			switch(type_num[0]){
 				case 1:{
 //					qlat::Printf("Type %d: (%d,%d,%d,%d)\n", 1, x[0],x[1],x[2],x[3]);
@@ -353,6 +353,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[mu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = mu;
 						directions[1] = nu;
@@ -364,6 +365,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[mu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = mu;
 						directions[1] = nu+DIMN;
@@ -375,6 +377,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[nu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = nu;
 						directions[1] = nu;
@@ -386,6 +389,7 @@ inline void get_Fforce(
 					
 						y = x; y[nu] += -2;
 						ins = ClField.get_elems(y/2)[nu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = nu+DIMN;
 						directions[1] = nu+DIMN;
@@ -401,6 +405,7 @@ inline void get_Fforce(
 				case 2:{
 					y = x; y[type_num[1]]--;
 					ins = ClField.get_elems(y/2)[mu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					s = x; s[mu]++;
 					directions[0] = mu;
 					directions[1] = type_num[1]+DIMN;
@@ -412,6 +417,7 @@ inline void get_Fforce(
 				
 					y = x; y[type_num[1]]++;
 					ins = ClField.get_elems(y/2)[mu];
+					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					s = x; s[mu]++;
 					directions[0] = mu;
 					directions[1] = type_num[1];
@@ -433,6 +439,7 @@ inline void get_Fforce(
 						
 						y = x; y[mu]--;
 						ins = ClField.get_elems(y/2)[mu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = nu;
 						directions[1] = mu+DIMN;
@@ -444,6 +451,7 @@ inline void get_Fforce(
 					
 						y = x; y[mu]--;
 						ins = ClField.get_elems(y/2)[mu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = nu+DIMN;
 						directions[1] = mu+DIMN;
@@ -455,6 +463,7 @@ inline void get_Fforce(
 					
 						y = x; y[mu]++;
 						ins = ClField.get_elems(y/2)[nu];
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						s = x; s[mu]++;
 						directions[0] = -1;
 						directions[1] = nu;
@@ -465,6 +474,7 @@ inline void get_Fforce(
 						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
 					
 						y = x; y[mu]++; y[nu] += -2;
+						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						ins = ClField.get_elems(y/2)[nu];
 						s = x; s[mu]++;
 						directions[0] = nu+DIMN;
@@ -481,6 +491,7 @@ inline void get_Fforce(
 				case 4:{
 					y = x; y[type_num[1]]--; y[mu]--; // y-\nu-\mu
 					ins = ClField.get_elems(y/2)[mu];
+					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					s = x; s[mu]++; // y+\mu
 					directions[0] = type_num[1]+DIMN;
 					directions[1] = mu+DIMN;
@@ -492,6 +503,7 @@ inline void get_Fforce(
 				
 					y = x; y[type_num[1]]++; y[mu]--; // y+\nu+\mu
 					ins = ClField.get_elems(y/2)[mu]; 
+					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					s = x; s[mu]++; // y+\mu
 					directions[0] = type_num[1];
 					directions[1] = mu+DIMN;
