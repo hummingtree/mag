@@ -23,10 +23,6 @@ using namespace qlat;
 using namespace std;
 
 QLAT_START_NAMESPACE
-
-static const double rho = -0.3;
-static const double eta_sqr = 1.*1.;
-
 // notations follow hep-lat/0311018
 inline cps::Matrix get_U(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu){
 	qlat::Coordinate y = x; y[mu]++;
@@ -286,7 +282,8 @@ inline void get_Fforce(
     Field<cps::Matrix>& FfField,
     Field<cps::Matrix>& FgField,
     Field<cps::Matrix>& CgField,
-    const Arg_chmc& Farg
+    const Arg_chmc& Farg,
+	Chart<cps::Matrix>& Cchart
 ){
 	// TODO!!!
 	// HUGE amount of work need to be done.
@@ -341,7 +338,7 @@ inline void get_Fforce(
 			ClField.get_elems(x)[mu] = compute_Lambda(Q, SigmaP, get_U(FgField, 2*x, mu));
 			// qlat::Printf("%.12f\n", ClField.get_elems(x)[mu]);
 	}}
-	fetch_expanded(ClField);
+	fetch_expanded_chart(ClField, Cchart);
 
 #pragma omp parallel for
 	for(long index = 0; index < FfField.geo.local_volume(); index++){
@@ -354,7 +351,7 @@ inline void get_Fforce(
 			mTemp.ZeroMatrix();
 			vector<int> directions(6);
 			qlat::Coordinate y; // insertion pos
-			qlat::Coordinate s; // starting pos
+			qlat::Coordinate s = x; s[mu]++; // starting pos
 			cps::Matrix ins; // insertion matrix
 			array<int, 2> type_num = stout_type(x, mu);
 //			qlat::Printf("Type %d-%d:(%d,%d,%d,%d)%d\n", type_num[0], type_num[1], x[0],x[1],x[2],x[3],mu);
@@ -370,8 +367,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[mu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = mu;
 						directions[1] = nu;
 						directions[2] = mu+DIMN;
@@ -382,8 +378,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[mu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = mu;
 						directions[1] = nu+DIMN;
 						directions[2] = mu+DIMN;
@@ -394,8 +389,7 @@ inline void get_Fforce(
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[nu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = nu;
 						directions[1] = nu;
 						directions[2] = mu+DIMN;
@@ -406,8 +400,7 @@ inline void get_Fforce(
 					
 						y = x; y[nu] += -2;
 						ins = ClField.get_elems(y/2)[nu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = nu+DIMN;
 						directions[1] = nu+DIMN;
 						directions[2] = mu+DIMN;
@@ -422,8 +415,7 @@ inline void get_Fforce(
 				case 2:{
 					y = x; y[type_num[1]]--;
 					ins = ClField.get_elems(y/2)[mu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-					s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					directions[0] = mu;
 					directions[1] = type_num[1]+DIMN;
 					directions[2] = mu+DIMN;
@@ -434,8 +426,7 @@ inline void get_Fforce(
 				
 					y = x; y[type_num[1]]++;
 					ins = ClField.get_elems(y/2)[mu];
-					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-					s = x; s[mu]++;
+//					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 					directions[0] = mu;
 					directions[1] = type_num[1];
 					directions[2] = mu+DIMN;
@@ -456,8 +447,7 @@ inline void get_Fforce(
 						
 						y = x; y[mu]--;
 						ins = ClField.get_elems(y/2)[mu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = nu;
 						directions[1] = mu+DIMN;
 						directions[2] = mu+DIMN;
@@ -468,8 +458,7 @@ inline void get_Fforce(
 					
 						y = x; y[mu]--;
 						ins = ClField.get_elems(y/2)[mu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = nu+DIMN;
 						directions[1] = mu+DIMN;
 						directions[2] = mu+DIMN;
@@ -480,8 +469,7 @@ inline void get_Fforce(
 					
 						y = x; y[mu]++;
 						ins = ClField.get_elems(y/2)[nu];
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-						s = x; s[mu]++;
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						directions[0] = -1;
 						directions[1] = nu;
 						directions[2] = nu;
@@ -491,9 +479,8 @@ inline void get_Fforce(
 						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
 					
 						y = x; y[mu]++; y[nu] += -2;
-						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
+//						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
 						ins = ClField.get_elems(y/2)[nu];
-						s = x; s[mu]++;
 						directions[0] = nu+DIMN;
 						directions[1] = nu+DIMN;
 						directions[2] = -1;
@@ -509,7 +496,6 @@ inline void get_Fforce(
 					y = x; y[type_num[1]]--; y[mu]--; // y-\nu-\mu
 					ins = ClField.get_elems(y/2)[mu];
 					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-					s = x; s[mu]++; // y+\mu
 					directions[0] = type_num[1]+DIMN;
 					directions[1] = mu+DIMN;
 					directions[2] = mu+DIMN;
@@ -521,7 +507,6 @@ inline void get_Fforce(
 					y = x; y[type_num[1]]++; y[mu]--; // y+\nu+\mu
 					ins = ClField.get_elems(y/2)[mu]; 
 					assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
-					s = x; s[mu]++; // y+\mu
 					directions[0] = type_num[1];
 					directions[1] = mu+DIMN;
 					directions[2] = mu+DIMN;
@@ -601,7 +586,7 @@ inline void force_gradient_integrator_multi(
 		fetch_expanded_chart(FgField, Fchart);
 		fetch_expanded_chart(CgField, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgField, CgField, Farg);
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart);
 		get_Cforce(CfField, FgField, CgField, Farg);
 		FgFieldAuxil = FgField;
 		CgFieldAuxil = CgField;
@@ -610,7 +595,7 @@ inline void force_gradient_integrator_multi(
 		fetch_expanded_chart(FgFieldAuxil, Fchart);
 		fetch_expanded_chart(CgFieldAuxil, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg);
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart);
 		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg);
 		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
 		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg);
@@ -621,7 +606,7 @@ inline void force_gradient_integrator_multi(
 		fetch_expanded_chart(FgField, Fchart);
 		fetch_expanded_chart(CgField, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgField, CgField, Farg);
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart);
 		get_Cforce(CfField, FgField, CgField, Farg);
 		FgFieldAuxil = FgField;
 		CgFieldAuxil = CgField;
@@ -630,7 +615,7 @@ inline void force_gradient_integrator_multi(
 		fetch_expanded_chart(FgFieldAuxil, Fchart);
 		fetch_expanded_chart(CgFieldAuxil, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg);
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart);
 		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg);
 		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
 		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg);
@@ -707,8 +692,8 @@ inline void run_hmc_multi(
 
 	fetch_expanded(CgField);
 	fetch_expanded(FgField);
-    // qlat::Printf("FINE   Plaquette = %.12f\n", avg_plaquette(FgField));	
-    // qlat::Printf("COARSE Plaquette = %.12f\n", avg_plaquette(CgField));	
+    qlat::Printf("FINE   Plaquette = %.12f\n", avg_plaquette(FgField));	
+    qlat::Printf("COARSE Plaquette = %.12f\n", avg_plaquette(CgField));	
 
 	Geometry Crng_geo; 
 	Crng_geo.init(CmField.geo.geon, 1, CmField.geo.node_site);
@@ -728,6 +713,7 @@ inline void run_hmc_multi(
 	double del_hamiltonian;
 	double accept_probability;
 	double average_plaquette;
+	double Caverage_plaquette;
 	
 	vector<double> old_energy_partition;
 	vector<double> new_energy_partition;
@@ -781,14 +767,21 @@ inline void run_hmc_multi(
 		qlat::Printf("Die Roll        =\t%12.6f\n", die_roll); 	
 	
 		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded(CgField);
 		average_plaquette = avg_plaquette(FgField);
+		Caverage_plaquette = avg_plaquette(CgField);
 		qlat::Printf("Avg Plaquette   =\t%+.12e\n", average_plaquette); 
+		qlat::Printf("Avg Plaquette C =\t%+.12e\n", Caverage_plaquette); 
 		qlat::Printf("ACCEPT RATE     =\t%+.4f\n", (double)num_accept / (num_accept + num_reject));	
 
 		if(Farg.summary_dir_stem.size() > 0){
-			Fprintf(p, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
-					i + 1, abs(del_hamiltonian), accept_probability, average_plaquette, does_accept, 
-					does_accept?new_energy_partition[1]:old_energy_partition[1]);
+			Fprintf(p, "%d\t%.6e\t%.6e\t%.12e\t%.12e\t%i\t%.12e\t%.12e\t%.12e\n", 
+					i+1, abs(del_hamiltonian), accept_probability, average_plaquette,
+					Caverage_plaquette,
+					does_accept, 
+					does_accept?new_energy_partition[0]:old_energy_partition[0],
+					does_accept?new_energy_partition[1]:old_energy_partition[1],
+					does_accept?new_energy_partition[2]:old_energy_partition[2]);
 			Fflush(p);
 		}
 
@@ -799,7 +792,7 @@ inline void run_hmc_multi(
 			arg_export.ensemble_label = "multi";
 			
 			if(Farg.export_dir_stem.size() > 0){
-				string address = Farg.export_dir_stem + "ckpoint." + show(i + 1);
+				string address = Farg.export_dir_stem + "/ckpoint_lat." + show(i + 1);
 				export_config_nersc(FgField_ext, address, arg_export, true);
 			}
 			
