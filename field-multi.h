@@ -794,6 +794,8 @@ inline void run_hmc_multi(
 			if(Farg.export_dir_stem.size() > 0){
 				string address = Farg.export_dir_stem + "/ckpoint_lat." + show(i + 1);
 				export_config_nersc(FgField_ext, address, arg_export, true);
+				address = Farg.export_dir_stem + "/ckpoint_Clat." + show(i + 1);
+				export_config_nersc(CgField_ext, address, arg_export, true);
 			}
 			
 			sync_node();
