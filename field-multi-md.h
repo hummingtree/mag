@@ -16,158 +16,22 @@
 
 #include "field-matrix.h"
 #include "field-hmc.h"
+#include "field-multi.h"
 #include <cmath>
 
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
-QLAT_START_NAMESPACE
-// notations follow hep-lat/0311018
-inline cps::Matrix get_U(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu){
-	qlat::Coordinate y = x; y[mu]++;
-	return fine_gField.get_elems(x)[mu] * fine_gField.get_elems(y)[mu];
-}
+namespace md { // This a variant of the original functions.
 
-inline cps::Matrix get_Q(Field<cps::Matrix>& fine_gField, const qlat::Coordinate& x, int mu, double rho_){
-	// assuming properly communicated.
-	cps::Matrix stp = get_staple_rect(fine_gField, x, mu);
-	cps::Matrix dg; dg.Dagger(get_U(fine_gField, x, mu));
-	cps::Matrix Omega = stp * dg; Omega.TrLessAntiHermMatrix();
-	// qlat::Printf("%.12e\n", (Omega*Omega).ReTr());
-	return Omega * qlat::Complex(0., -rho_); // minus sign b/c of the unconventional convention in (2) of hep-lat/0311018
-}
+static const double md_alpha = -0.9;
 
-inline cps::Matrix hermitian_traceless(const cps::Matrix& M){
-	cps::Matrix one; one.UnitMatrix();
-	cps::Matrix dg; dg.Dagger(M);
-	return ((M+dg)-one*((M+dg).Tr()/3.))*0.5;
-}
-
-inline cps::Matrix compute_Lambda(const cps::Matrix& Q, const cps::Matrix& SigmaP, const cps::Matrix& U){
-	cps::Matrix one; one.UnitMatrix();
-	double c0 = (Q * Q * Q).ReTr() / 3.;
-	bool reflect = false;
-	if(c0 < 0.){
-		c0 = -c0;
-		reflect = true;
-	}
-	double c1 = (Q * Q).ReTr() / 2.;
-	cps::Matrix zero; zero.ZeroMatrix();
-	if(c1 == 0) return zero;
-	double c0m = 2.* pow(c1/3., 1.5);
-	double theta = acos(c0/c0m);
-	double u = sqrt(c1/3.) * cos(theta/3.);
-	double w = sqrt(c1) * sin(theta/3.);
-
-	// qlat::Printf("u=%.12f\tw=%.12f\n", u, w);	
-
-	double xi0;
-	double xi1;
-	if(w*w < 0.05*0.05){
-		xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
-		xi1 = -1./2.*(1.-w*w/12.*(1.-w*w/30.)) + 1./6.*(1.-w*w/20.*(1.-w*w/42.));
-	}
-	else{
-		xi0 = sin(w)/w;
-		xi1 = cos(w)/(w*w)-sin(w)/(w*w*w);
-	}
-	qlat::Complex h0 = (u*u-w*w)*expix(2.*u) + expix(-u)*(8.*u*u*cos(w)+i()*2.*u*(3.*u*u+w*w)*xi0);
-	qlat::Complex h1 = 2.*u*expix(2.*u) - expix(-u)*(2.*u*cos(w)-i()*(3.*u*u-w*w)*xi0);
-	qlat::Complex h2 = expix(2.*u)-expix(-u)*(cos(w)+i()*3.*u*xi0);
-	qlat::Complex f0 = h0 / (9.*u*u-w*w);
-	qlat::Complex f1 = h1 / (9.*u*u-w*w);
-	qlat::Complex f2 = h2 / (9.*u*u-w*w);
-
-	qlat::Complex r01 = 2.*( u + i()*(u*u-w*w) ) * expix(2.*u) + 
-						2.*expix(-u)*( 
-										4.*u*(2.-i()*u)*cos(w) + 
-										i()*xi0*( 9.*u*u + w*w - i()*u*(3.*u*u+w*w) )
-						);
-
-	qlat::Complex r11 = 2.*( 1.+2.*i()*u ) * expix(2.*u) + 
-						expix(-u)*( 
-									-2.*(1.-i()*u)*cos(w) + 
-									i()*xi0*(6.*u+i()*(w*w-3.*u*u)) 
-						);
-
-	qlat::Complex r21 = 2.*i()*expix(2.*u) + 
-						i()*expix(-u)*( cos(w)-3.*xi0*(1.-i()*u) );
-
-	qlat::Complex r02 = -2.*expix(2.*u) + 
-						2.*i()*u*expix(-u)*( cos(w) + (1.+4.*i()*u)*xi0 + 3.*u*u*xi1 );
-	qlat::Complex r12 = -i()*expix(-u) * ( 
-											cos(w) 
-											+ (1.+2.*i()*u)*xi0 
-											- 3.*u*u*xi1 
-						);
-	qlat::Complex r22 = expix(-u) * (xi0 - 3.*i()*u*xi1);
-
-	qlat::Complex b10 = (2.*u*r01 + (3.*u*u-w*w)*r02 - 2.*(15.*u*u+w*w)*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b11 = (2.*u*r11 + (3.*u*u-w*w)*r12 - 2.*(15.*u*u+w*w)*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b12 = (2.*u*r21 + (3.*u*u-w*w)*r22 - 2.*(15.*u*u+w*w)*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-
-	qlat::Complex b20 = (r01 - 3.*u*r02 - 24.*u*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b21 = (r11 - 3.*u*r12 - 24.*u*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-	qlat::Complex b22 = (r21 - 3.*u*r22 - 24.*u*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
-
-	if(reflect){
-		f0 = conj(f0);
-		f1 = -conj(f1);
-		f2 = conj(f2);
-	
-		b10 = conj(b10);
-		b11 = -conj(b11);
-		b12 = conj(b12);
-		b20 = -conj(b20);
-		b21 = conj(b21);
-		b22 = -conj(b22);
-	}
-
-	// qlat::Printf("f0=%.12f\tf0=%.12f\n", f0.real(), f0.imag());	
-	// qlat::Printf("f1=%.12f\tf1=%.12f\n", f1.real(), f1.imag());	
-	// qlat::Printf("f2=%.12f\tf2=%.12f\n", f2.real(), f2.imag());	
-	
-	cps::Matrix B1 = one * b10 + Q * b11 + Q * Q * b12;
-	cps::Matrix B2 = one * b20 + Q * b21 + Q * Q * b22;
-
-	cps::Matrix Gamma = Q * (SigmaP*B1*U).Tr() + Q * Q * (SigmaP*B2*U).Tr() + U*SigmaP*f1 + Q*U*SigmaP*f2 + U*SigmaP*Q*f2;
-	return hermitian_traceless(Gamma);
-}
-
-inline double get_kinetic_energy(Field<cps::Matrix>& mField, double m = 1.){
-
-	double localSum = 0.; // local sum of Tr(\pi*\pi^\dagger)
-	int numThreads;
-	vector<double> ppLocalSum;
-
-#pragma omp parallel
-{
-	if(omp_get_thread_num() == 0){
-		numThreads = omp_get_num_threads();
-		ppLocalSum.resize(numThreads);
-	}
-	double pLocalSum = 0.;
-#pragma omp barrier
-#pragma omp for
-	for(long index = 0; index < mField.geo.local_volume(); index++){
-		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
-		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
-		for(int mu = 0; mu < DIMN; mu++){
-			pLocalSum += (mx[mu] * mx[mu]).ReTr();
-	}}
-	ppLocalSum[omp_get_thread_num()] = pLocalSum;
-}
-	for(int i = 0; i < numThreads; i++){
-		localSum += ppLocalSum[i];
-	}
-
-	double globalSum;
-	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
-	return globalSum / (2. * m);
-}
-
-inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& CgField){
+inline double get_xi_energy(
+	Field<cps::Matrix>& FgField, 
+	Field<cps::Matrix>& CgField,
+	Field<double>& CxField // the xi field
+	){
 	TIMER("get_eta_energy");
 	
 	double localSum = 0.;
@@ -186,6 +50,7 @@ inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& Cg
 	for(long index = 0; index < CgField.geo.local_volume(); index++){
 		qlat::Coordinate x = CgField.geo.coordinate_from_index(index);
 		const qlat::Vector<cps::Matrix> mx = CgField.get_elems_const(x);
+		const qlat::Vector<double> xx = CxField.get_elems_const(x);
 		for(int mu = 0; mu < DIMN; mu++){
 			// The actaul work
 			// first compute Q.
@@ -193,7 +58,7 @@ inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& Cg
 			cps::Matrix Gb = expiQ(Q)*get_U(FgField, 2*x, mu); 
 			cps::Matrix Ucd; Ucd.Dagger(mx[mu]);
 	//		cps::Matrix Ucd; Ucd.UnitMatrix();
-			pLocalSum += (Ucd*Gb).ReTr()/eta_sqr;
+			pLocalSum += (Ucd*Gb).ReTr() * xx[mu];
 	}}
 	ppLocalSum[omp_get_thread_num()] = pLocalSum;
 }
@@ -203,7 +68,7 @@ inline double get_eta_energy(Field<cps::Matrix>& FgField, Field<cps::Matrix>& Cg
 
 	double globalSum;
 	MPI_Allreduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, get_comm());
-	return -globalSum;
+	return -globalSum * (1. + md_alpha); // note the minus sign
 }
 
 inline double get_hamiltonian_multi(
@@ -212,14 +77,14 @@ inline double get_hamiltonian_multi(
 	const Arg_chmc& Farg, 
 	Chart<cps::Matrix>& Fchart, 
 	Field<cps::Matrix>& CgField, 
-	Field<cps::Matrix>& CmField, 
 	Chart<cps::Matrix>& Cchart, 
+	Field<double>& CxField, // the xi field
 	vector<double>& part
 ){
 	TIMER("get_hamiltonian_multi()");
 	
 	// momentum part
-	double kinetic_energy = get_kinetic_energy(FmField) + get_kinetic_energy(CmField);
+	double kinetic_energy = get_kinetic_energy(FmField);
 
 	// original fine action
 	fetch_expanded_chart(FgField, Fchart);
@@ -234,43 +99,18 @@ inline double get_hamiltonian_multi(
 		potential_energy = (p1*(1.-8.*Farg.gauge.c1) + p2*Farg.gauge.c1) * Farg.beta / 3.;
 	}
 
-	// eta part
-	double eta_energy;
-	eta_energy = get_eta_energy(FgField, CgField);
+	// xi part
+	double xi_energy;
+	xi_energy = get_xi_energy(FgField, CgField, CxField);
 
 	// summing
 	part.resize(3);
 	part[0] = kinetic_energy;
 	part[1] = potential_energy;
-	part[2] = eta_energy;
+	part[2] = xi_energy;
 	qlat::Printf("energy partition: %.12f\t%.12f\t%.12f\n", part[0], part[1], part[2]);
 //	return kinetic_energy + potential_energy;
-	return kinetic_energy + potential_energy + eta_energy;
-}
-
-inline vector<int> count_num_odd(const qlat::Coordinate& x){
-	vector<int> rtn(0);
-	for(int i = 0; i < DIMN; i++){
-		if(x[i] % 2 == 1) rtn.push_back(i);
-	}
-	return rtn;
-}
-
-inline array<int, 2> stout_type(qlat::Coordinate& x, int mu){
-	// return 0, 1, 2, 3, 4 for different stout types.
-	vector<int> cnt = count_num_odd(x);
-	if(cnt.size() == 0){
-		return array<int, 2>{1, 0}; // type 1
-	}else if(cnt.size() == 1){
-		if(cnt[0] == mu) return array<int, 2>{3, 0}; // type 3
-		else return array<int, 2>{2, cnt[0]}; // type 2
-	}else if(cnt.size() == 2){
-		if(cnt[0] == mu) return array<int, 2>{4, cnt[1]}; // type 4
-		if(cnt[1] == mu) return array<int, 2>{4, cnt[0]};
-		return array<int, 2>{0, 0};
-	}else{
-		return array<int, 2>{0, 0};
-	}
+	return kinetic_energy + potential_energy + xi_energy;
 }
 
 inline void get_Fforce(
@@ -278,7 +118,8 @@ inline void get_Fforce(
     Field<cps::Matrix>& FgField,
     Field<cps::Matrix>& CgField,
     const Arg_chmc& Farg,
-	Chart<cps::Matrix>& Cchart
+	Chart<cps::Matrix>& Cchart,
+	Field<double>& CxField
 ){
 	// TODO!!!
 	// HUGE amount of work need to be done.
@@ -334,6 +175,8 @@ inline void get_Fforce(
 			// qlat::Printf("%.12f\n", ClField.get_elems(x)[mu]);
 	}}
 	fetch_expanded_chart(ClField, Cchart);
+	
+	fetch_expanded(CxField); // could be accerlarated by chart
 
 #pragma omp parallel for
 	for(long index = 0; index < FfField.geo.local_volume(); index++){
@@ -354,7 +197,7 @@ inline void get_Fforce(
 				case 1:{
 //					qlat::Printf("Type %d: (%d,%d,%d,%d)\n", 1, x[0],x[1],x[2],x[3]);
 					y = x; y[mu]++;
-					mTemp += FgField.get_elems(y)[mu] * dagger(CgField.get_elems(x/2)[mu]) * expiQ(get_Q(FgField, x, mu, rho));
+					mTemp += FgField.get_elems(y)[mu] * dagger(CgField.get_elems(x/2)[mu]) * expiQ(get_Q(FgField, x, mu, rho)) * CxField.get_elems(x/2)[mu];
 //					mTemp += FgField.get_elems(y)[mu] * dagger(CgField.get_elems(x/2)[mu]);
 
 					for(int nu = 0; nu < DIMN; nu++){
@@ -369,7 +212,7 @@ inline void get_Fforce(
 						directions[3] = mu+DIMN;
 						directions[4] = nu+DIMN;
 						directions[5] = -1;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[mu];
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[mu];
@@ -380,7 +223,7 @@ inline void get_Fforce(
 						directions[3] = mu+DIMN;
 						directions[4] = nu;
 						directions[5] = -1;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[mu];
 						
 						y = x;
 						ins = ClField.get_elems(y/2)[nu];
@@ -391,7 +234,7 @@ inline void get_Fforce(
 						directions[3] = nu+DIMN;
 						directions[4] = nu+DIMN;
 						directions[5] = -1;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[nu];
 					
 						y = x; y[nu] += -2;
 						ins = ClField.get_elems(y/2)[nu];
@@ -402,7 +245,7 @@ inline void get_Fforce(
 						directions[3] = -1;
 						directions[4] = nu;
 						directions[5] = nu;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[nu];
 					}
 
 					break;
@@ -417,7 +260,7 @@ inline void get_Fforce(
 					directions[3] = mu+DIMN;
 					directions[4] = -1;
 					directions[5] = type_num[1];
-					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[mu];
 				
 					y = x; y[type_num[1]]++;
 					ins = ClField.get_elems(y/2)[mu];
@@ -428,14 +271,14 @@ inline void get_Fforce(
 					directions[3] = mu+DIMN;
 					directions[4] = -1;
 					directions[5] = type_num[1]+DIMN;
-					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[mu];
 					
 					break;
 				}
 				case 3:{
 //					qlat::Printf("Type %d: (%d,%d,%d,%d)\n", 3, x[0],x[1],x[2],x[3]);
 					y = x; y[mu]--;
-					mTemp += dagger(CgField.get_elems(y/2)[mu]) * expiQ(get_Q(FgField, y, mu, rho)) * FgField.get_elems(y)[mu];
+					mTemp += dagger(CgField.get_elems(y/2)[mu]) * expiQ(get_Q(FgField, y, mu, rho)) * FgField.get_elems(y)[mu] * CxField.get_elems(y/2)[mu];
 //					mTemp += dagger(CgField.get_elems(y/2)[mu]) * FgField.get_elems(y)[mu];
 					for(int nu = 0; nu < DIMN; nu++){
 						if(nu == mu) continue;
@@ -449,7 +292,7 @@ inline void get_Fforce(
 						directions[3] = nu+DIMN;
 						directions[4] = -1;
 						directions[5] = mu;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[mu];
 					
 						y = x; y[mu]--;
 						ins = ClField.get_elems(y/2)[mu];
@@ -460,7 +303,7 @@ inline void get_Fforce(
 						directions[3] = nu;
 						directions[4] = -1;
 						directions[5] = mu;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[mu];
 					
 						y = x; y[mu]++;
 						ins = ClField.get_elems(y/2)[nu];
@@ -471,7 +314,7 @@ inline void get_Fforce(
 						directions[3] = mu+DIMN;
 						directions[4] = nu+DIMN;
 						directions[5] = nu+DIMN;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (+rho*i()) * CxField.get_elems(y/2)[nu];
 					
 						y = x; y[mu]++; y[nu] += -2;
 //						assert(y[0]%2==0 && y[1]%2==0 && y[2]%2==0 && y[3]%2==0);
@@ -482,7 +325,7 @@ inline void get_Fforce(
 						directions[3] = mu+DIMN;
 						directions[4] = nu;
 						directions[5] = nu;
-						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+						mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[nu];
 					}
 
 					break;
@@ -497,7 +340,7 @@ inline void get_Fforce(
 					directions[3] = -1;
 					directions[4] = type_num[1];
 					directions[5] = mu;
-					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[mu];
 				
 					y = x; y[type_num[1]]++; y[mu]--; // y+\nu+\mu
 					ins = ClField.get_elems(y/2)[mu]; 
@@ -508,7 +351,7 @@ inline void get_Fforce(
 					directions[3] = -1;
 					directions[4] = type_num[1]+DIMN;
 					directions[5] = mu;
-					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i());
+					mTemp += get_path_ordered_product_insertion(FgField, s, directions, ins) * (-rho*i()) * CxField.get_elems(y/2)[mu];
 	
 					break;
 				}
@@ -519,36 +362,80 @@ inline void get_Fforce(
 			}
 			mTemp = gx[mu] * mTemp;
 			mTemp.TrLessAntiHermMatrix(); 
-			fx[mu] += mTemp * ( i()/eta_sqr );
+			fx[mu] += mTemp * ( i() );
 	}}
 
+}
+
+inline cps::Matrix get_DQ(
+	Field<cps::Matrix>& FgField,
+	Field<cps::Matrix>& FmField,
+	const qlat::Coordinate& x, 
+	int mu,
+	double rho_
+){
+	// assuming properly communicated.
+	
+	vector<int> dir; dir.reserve(6);
+	cps::Matrix series; series.ZeroMatrix();
+
+	for(int nu = 0; nu < DIMN; nu++){
+		if(mu == nu) continue;
+		
+		dir.clear();
+ 		dir.push_back(nu); dir.push_back(mu); dir.push_back(mu); 
+		dir.push_back(nu + DIMN); dir.push_back(mu + DIMN); dir.push_back(mu + DIMN);
+		series += get_path_ordered_product_leftD(FgField, FmField, 2*x, dir);
+		
+		dir.clear();
+ 		dir.push_back(nu + DIMN); dir.push_back(mu); dir.push_back(mu); 
+		dir.push_back(nu); dir.push_back(mu + DIMN); dir.push_back(mu + DIMN);
+		series += get_path_ordered_product_leftD(FgField, FmField, 2*x, dir);
+	}
+
+	series.TrLessAntiHermMatrix();
+	return series * qlat::Complex(0., -rho_);
 }
 
 inline void get_Cforce(
 	Field<cps::Matrix>& CfField,
 	Field<cps::Matrix>& FgField,
-	Field<cps::Matrix>& CgField,
-	const Arg_chmc& Farg
+	Field<cps::Matrix>& FmField
 ){
 	TIMER("get_Cforce()");
-	assert(is_matching_geo(CfField.geo, CgField.geo));
+
+	// assuming properly communicated.
 
 #pragma omp parallel for
 	for(long index = 0; index < CfField.geo.local_volume(); index++){
 		qlat::Coordinate x; x = CfField.geo.coordinate_from_index(index);
-		cps::Matrix Q, Gbd, mTemp;
-		const qlat::Vector<cps::Matrix> gx = CgField.get_elems_const(x);
+		cps::Matrix Q, U, DQ, DU, Gbd, mTemp;
 		qlat::Vector<cps::Matrix> fx = CfField.get_elems(x);
 		for(int mu = 0; mu < CfField.geo.multiplicity; mu++){
 			// actual work!
+			vector<int> dir(2, mu);
 			Q = get_Q(FgField, 2*x, mu, rho);
-			Gbd.Dagger( expiQ(Q)*get_U(FgField, 2*x, mu) ); 		
-			mTemp = gx[mu] * Gbd;
-			mTemp.TrLessAntiHermMatrix(); 
-			fx[mu] = mTemp * (i()/eta_sqr);
+			U = get_U(FgField, 2*x, mu);
+			DQ = get_DQ(FgField, FmField, 2*x, mu, rho);
+			DU = get_path_ordered_product_leftD(FgField, FmField, 2*x, dir);
+			mTemp = (DQ*expiQ(Q)*U*i() + expiQ(Q)*DU) * dagger(expiQ(Q)*U);
+			mTemp.TrLessAntiHermMatrix();
+			fx[mu] = mTemp*(md_alpha/(1.+md_alpha));
 	}}
 }
-
+//
+//inline void evolve_Cgauge_field(
+//	Field<cps::Matrix>& CgField,
+//	Field<cps::Matrix>& CmField,
+//	Field<cps::Matrix>& FgField,
+//	Field<cps::Matrix>& FmField,
+//	double dt,
+//	const Arg_chmck& arg
+//){
+//	get_Cforce(CmField, FgField, FmField);
+//	evolve_gauge_field(CgField, CmField, dt, arg);
+//}
+//
 inline void force_gradient_integrator_multi(
 	Field<cps::Matrix>& FgField, Field<cps::Matrix>& FmField, 
 	Field<cps::Matrix>& FgFieldAuxil, Field<cps::Matrix>& FfField,
@@ -556,7 +443,8 @@ inline void force_gradient_integrator_multi(
 	Chart<cps::Matrix>& Fchart,
 	Field<cps::Matrix>& CgField, Field<cps::Matrix>& CmField, 
 	Field<cps::Matrix>& CgFieldAuxil, Field<cps::Matrix>& CfField,
-	Chart<cps::Matrix>& Cchart
+	Chart<cps::Matrix>& Cchart,
+	Field<double>& CxField
 ){
 	// See mag.pdf for notations.
 
@@ -569,57 +457,85 @@ inline void force_gradient_integrator_multi(
 	assert(is_matching_geo(CgField.geo, CmField.geo));
 	assert(is_matching_geo(CgField.geo, CfField.geo));
 	assert(is_matching_geo(CgField.geo, CgFieldAuxil.geo));
+	assert(is_matching_geo(CgField.geo, CxField.geo));
 	const double alpha = (3.-sqrt(3.))*Farg.dt/6.;
 	const double beta = Farg.dt/sqrt(3.);
 	const double gamma = (2.-sqrt(3.))*Farg.dt*Farg.dt/12.;
 
+	fetch_expanded_chart(FgField, Fchart);
+	fetch_expanded_chart(FmField, Fchart);
+	get_Cforce(CmField, FgField, FmField);
 	evolve_gauge_field(FgField, FmField, alpha, Farg);
 	evolve_gauge_field(CgField, CmField, alpha, Farg);
 
 	sync_node();
 	for(int i = 0; i < Farg.trajectory_length; i++){
+
 		fetch_expanded_chart(FgField, Fchart);
 		fetch_expanded_chart(CgField, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgField, CgField, Farg, Cchart);
-		get_Cforce(CfField, FgField, CgField, Farg);
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgField, CgField, Farg, CxField);
 		FgFieldAuxil = FgField;
 		CgFieldAuxil = CgField;
+		
+		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded_chart(FmField, Fchart);
+		get_Cforce(CfField, FgField, FmField);
 		evolve_gauge_field(FgFieldAuxil, FfField, gamma, Farg);
 		evolve_gauge_field(CgFieldAuxil, CfField, gamma, Farg);
+		
 		fetch_expanded_chart(FgFieldAuxil, Fchart);
 		fetch_expanded_chart(CgFieldAuxil, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart);
-		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg);
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg, CxField);
 		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
-		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg);
+//		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg, M);
+	
+// -----------		
 
+		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded_chart(FmField, Fchart);
+		get_Cforce(CmField, FgField, FmField);
 		evolve_gauge_field(FgField, FmField, beta, Farg);
 		evolve_gauge_field(CgField, CmField, beta, Farg);
-	
+
+// -----------		
+
 		fetch_expanded_chart(FgField, Fchart);
 		fetch_expanded_chart(CgField, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgField, CgField, Farg, Cchart);
-		get_Cforce(CfField, FgField, CgField, Farg);
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgField, CgField, Farg, CxField);
 		FgFieldAuxil = FgField;
 		CgFieldAuxil = CgField;
+		
+		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded_chart(FmField, Fchart);
+		get_Cforce(CfField, FgField, FmField);
 		evolve_gauge_field(FgFieldAuxil, FfField, gamma, Farg);
 		evolve_gauge_field(CgFieldAuxil, CfField, gamma, Farg);
+		
 		fetch_expanded_chart(FgFieldAuxil, Fchart);
 		fetch_expanded_chart(CgFieldAuxil, Cchart);
 		// TODO!!!
-		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart);
-		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg);
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgFieldAuxil, CgFieldAuxil, Farg, CxField);
 		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
-		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg);
-
+//		evolve_momentum(CmField, CfField, 0.5 * Farg.dt, Farg, M);
+	
 		if(i < Farg.trajectory_length - 1){
-			evolve_gauge_field(FgField, FmField, 2. * alpha, Farg);
-			evolve_gauge_field(CgField, CmField, 2. * alpha, Farg);
+			fetch_expanded_chart(FgField, Fchart);
+			fetch_expanded_chart(FmField, Fchart);
+			get_Cforce(CmField, FgField, FmField);
+			evolve_gauge_field(FgField, FmField, 2.*alpha, Farg);
+			evolve_gauge_field(CgField, CmField, 2.*alpha, Farg);
 		} 
 		else{
+			fetch_expanded_chart(FgField, Fchart);
+			fetch_expanded_chart(FmField, Fchart);
+			get_Cforce(CmField, FgField, FmField);
 			evolve_gauge_field(FgField, FmField, alpha, Farg);
 			evolve_gauge_field(CgField, CmField, alpha, Farg);
 		}
@@ -627,6 +543,80 @@ inline void force_gradient_integrator_multi(
 
 	qlat::Printf("reunitarize FgField: max deviation = %.8e\n", reunitarize(FgField));
 	qlat::Printf("reunitarize CgField: max deviation = %.8e\n", reunitarize(CgField));
+}
+
+inline void init_xi(
+	Field<double>& CxField,
+	Field<cps::Matrix>& FgField,	
+	Field<cps::Matrix>& CgField,
+	Chart<cps::Matrix>& Fchart,
+	RngField& rng_field,
+	Field<double>& CbField
+	){
+
+	fetch_expanded_chart(FgField, Fchart);
+
+#pragma omp parallel for
+	for(long index = 0; index < CxField.geo.local_volume(); index++){
+		qlat::Coordinate x = CxField.geo.coordinate_from_index(index);
+		qlat::Vector<double> xx = CxField.get_elems(x);
+		for(int mu = 0; mu < DIMN; mu++){
+			xx[mu] = 12.5;
+	}}
+
+//#pragma omp parallel for
+//	for(long index = 0; index < CxField.geo.local_volume(); index++){
+//		qlat::Coordinate x = CxField.geo.coordinate_from_index(index);
+//		qlat::Vector<cps::Matrix> mx = CgField.get_elems(x);
+//		qlat::Vector<double> xx = CxField.get_elems(x);
+//		qlat::Vector<double> bx = CbField.get_elems(x);
+//		double B;
+//		for(int mu = 0; mu < DIMN; mu++){
+//			// The actaul work
+//			// first compute Q.
+//			cps::Matrix Q = get_Q(FgField, 2*x, mu, rho);
+//			cps::Matrix Gb = expiQ(Q)*get_U(FgField, 2*x, mu); 
+//			cps::Matrix Ucd; Ucd.Dagger(mx[mu]);
+//	//		cps::Matrix Ucd; Ucd.UnitMatrix(); 
+//			B = (Ucd*Gb).ReTr();
+//			double p = 1./(1.+std::exp((8.-2.)*B - (13.942245-1.235890))); // F2 = 24.33674, F1 = 1.23589  
+////			xx[mu] = g_rand_gen(rng_field.get_elem(x), XI0+ALPHA*ALPHA*B, ALPHA);
+//			if(u_rand_gen(rng_field.get_elem(x), 1., 0) < p){
+//			//	xx[mu] = g_rand_gen(rng_field.get_elem(x), 1.6+0.16*B, 0.4);
+//				xx[mu] = 2.;
+//				bx[mu] = B;
+////				mx[mu] = dagger(mx[mu]);
+//			}
+//			else{
+//			//	xx[mu] = g_rand_gen(rng_field.get_elem(x), 11.6+0.16*B, 0.4);
+//				xx[mu] = 8.;
+//				bx[mu] = B;
+//			}
+//	}}
+
+}
+
+inline void simplest_metropolis(cps::Matrix& var, const cps::Matrix& env, double coeff, RngState& rng){
+	cps::Matrix new_var = var * random_su3_from_su2(0.1, rng); // small = 0.1
+	double diff = coeff*(new_var*dagger(env)-var*dagger(env)).ReTr();
+	for(int i = 0; i < 6; i++){ // number of hits = 6
+		if(u_rand_gen(rng, 1., 0.) < std::exp(diff)){
+			var = new_var;
+		}
+	}
+}
+
+inline void heatbath(Field<cps::Matrix>& CgField, Field<cps::Matrix>& FgField, RngField& rng_field){
+#pragma omp parallel for
+	for(long index = 0; index < CgField.geo.local_volume(); index++){
+		qlat::Coordinate x = CgField.geo.coordinate_from_index(index);
+		qlat::Vector<cps::Matrix> gx = CgField.get_elems(x);
+		cps::Matrix Q, U;
+		for(int mu = 0; mu < DIMN; mu++){
+			Q = get_Q(FgField, 2*x, mu, rho);
+			U = get_U(FgField, 2*x, mu);
+			simplest_metropolis(gx[mu], expiQ(Q)*U, (1.+md_alpha*12.5), rng_field.get_elem(x));
+	}}
 }
 
 inline void run_hmc_multi(
@@ -684,6 +674,8 @@ inline void run_hmc_multi(
 	Field<cps::Matrix> CgField_auxil; CgField_auxil.init(Cgeo_expanded);
 	Field<cps::Matrix> CmField; CmField.init(Cgeo_expanded);
 	Field<cps::Matrix> CfField; CfField.init(Cgeo_expanded);
+	Field<double> CxField; CxField.init(Cgeo_expanded); // xi field
+	Field<double> CbField; CbField.init(Cgeo_expanded); // xi field
 
 	fetch_expanded(CgField);
 	fetch_expanded(FgField);
@@ -720,13 +712,19 @@ inline void run_hmc_multi(
 	for(int i = 0; i < Farg.num_trajectory; i++){
 
 		init_momentum(FmField, Frng_field);
-		init_momentum(CmField, Crng_field);
+//		should do Metropolis for CgField.
 		
+		heatbath(CgField, FgField, Crng_field);
+
+//		init_momentum(CmField, Crng_field, M);
+	
+		init_xi(CxField, FgField, CgField, Fchart, Crng_field, CbField);
+
 		// TODO!!!
-		old_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, CmField, Cchart, old_energy_partition);
+		old_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, Cchart, CxField, old_energy_partition);
 		force_gradient_integrator_multi(FgField, FmField, FgField_auxil, FfField, Farg, Fchart,
-										CgField, CmField, CgField_auxil, CfField, Cchart);
-		new_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, CmField, Cchart, new_energy_partition);
+										CgField, CmField, CgField_auxil, CfField, Cchart, CxField);
+		new_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, Cchart, CxField, new_energy_partition);
 	
 		die_roll = u_rand_gen(globalRngState);
 		del_hamiltonian = new_hamiltonian - old_hamiltonian;
@@ -791,6 +789,17 @@ inline void run_hmc_multi(
 				export_config_nersc(FgField_ext, address, arg_export, true);
 				address = Farg.export_dir_stem + "/ckpoint_Clat." + show(i + 1);
 				export_config_nersc(CgField_ext, address, arg_export, true);
+				
+				address = Farg.export_dir_stem + "/ckpoint_Xlat." + show(i + 1);
+				qlat::Field<double> X_output; X_output.init(CxField.geo);
+				qlat::sophisticated_make_to_order(X_output, CxField);
+				qlat::sophisticated_serial_write(X_output, address);
+				
+				address = Farg.export_dir_stem + "/ckpoint_Blat." + show(i + 1);
+				qlat::Field<double> B_output; B_output.init(CbField.geo);
+				qlat::sophisticated_make_to_order(B_output, CbField);
+				qlat::sophisticated_serial_write(B_output, address);
+
 			}
 			
 			sync_node();
@@ -800,7 +809,4 @@ inline void run_hmc_multi(
 	Timer::display();
 }
 
-
-
-
-QLAT_END_NAMESPACE
+}

@@ -173,6 +173,49 @@ inline void get_path_ordered_product(cps::Matrix &prod, const Field<cps::Matrix>
 	prod = mul;
 }
 
+inline cps::Matrix dagger(const cps::Matrix& M){
+	cps::Matrix rtn; rtn.Dagger(M);
+	return rtn;
+}
+
+inline cps::Matrix get_path_ordered_product_leftD(const Field<cps::Matrix>& FgField, 
+													const Field<cps::Matrix>& FmField,
+													const qlat::Coordinate& x, 
+													const vector<int>& dir)
+{
+	// assumming properly communicated.
+	
+	cps::Matrix add; add.ZeroMatrix();
+	int direction;
+	for(unsigned int d = 0; d < dir.size(); d++){	
+		qlat::Coordinate y(x);
+		cps::Matrix mul; mul.UnitMatrix();
+		for(unsigned int i = 0; i < dir.size(); i++){
+			direction = dir[i];
+			assert(direction < DIMN * 2 && direction > -2);
+			if(direction < DIMN){
+				if(i == d){
+					mul = mul * FmField.get_elems_const(y)[direction] 
+								* FgField.get_elems_const(y)[direction];
+				}else{
+					mul = mul * FgField.get_elems_const(y)[direction];
+				}
+				y[direction]++;
+			}else{
+				y[direction - DIMN]--;
+				if(i == d){
+					mul = mul * dagger(FmField.get_elems_const(y)[direction - DIMN] 
+								* FgField.get_elems_const(y)[direction - DIMN]);
+				}else{
+					mul = mul * dagger(FgField.get_elems_const(y)[direction - DIMN]);
+				}
+			}
+		}
+		add += mul;
+	}
+	return add;
+}
+
 inline cps::Matrix get_path_ordered_product_insertion(const Field<cps::Matrix> &field, 
 					const qlat::Coordinate &x, const vector<int> &dir, cps::Matrix& ins){
 	// assuming properly communicated.

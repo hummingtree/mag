@@ -377,7 +377,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 
 inline void evolve_momentum(Field<cps::Matrix> &mField, 
 				const Field<cps::Matrix> &fField, double dt, 
-				const Arg_chmc &arg){
+				const Arg_chmc &arg, double m = 1.){
 	TIMER("evolve_momentum()");
 	assert(is_matching_geo(mField.geo, fField.geo));
 #pragma omp parallel for
@@ -386,7 +386,7 @@ inline void evolve_momentum(Field<cps::Matrix> &mField,
 		const qlat::Vector<cps::Matrix> fx = fField.get_elems_const(x);
 			  qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
-			mx[mu] += fx[mu] * dt;
+			mx[mu] += fx[mu] * dt * m;
 	}}
 }
 
@@ -594,7 +594,7 @@ inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matri
 	return kineticEnergy + potential_energy;
 }
 
-inline void init_momentum(Field<cps::Matrix> &mField){
+inline void init_momentum(Field<cps::Matrix> &mField, double m = 1.){
 	TIMER("init_momentum()");
 
 	using namespace qlat;
@@ -607,6 +607,8 @@ inline void init_momentum(Field<cps::Matrix> &mField){
 		initialized = true;
 	}
 
+	double sig = std::sqrt(m);
+
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
@@ -615,15 +617,17 @@ inline void init_momentum(Field<cps::Matrix> &mField){
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
-				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x));
+				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x), 0., sig);
 			}
 			mx[mu] = mTemp;
 	}}
 }
 
-inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field){
+inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field, double m = 1.){
 	TIMER("init_momentum()");
 	using namespace qlat;
+
+	double sig = std::sqrt(m);
 
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
@@ -633,7 +637,7 @@ inline void init_momentum(Field<cps::Matrix> &mField, RngField &rng_field){
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
-				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x));
+				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x), 0., sig);
 			}
 			mx[mu] = mTemp;
 	}}
