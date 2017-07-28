@@ -184,7 +184,9 @@ inline cps::Matrix get_path_ordered_product_leftD(const Field<cps::Matrix>& FgFi
 													const vector<int>& dir)
 {
 	// assumming properly communicated.
-	
+
+	// momenta are hermitian, derivative goes like U'=i \pi U
+
 	cps::Matrix add; add.ZeroMatrix();
 	int direction;
 	for(unsigned int d = 0; d < dir.size(); d++){	
@@ -192,10 +194,10 @@ inline cps::Matrix get_path_ordered_product_leftD(const Field<cps::Matrix>& FgFi
 		cps::Matrix mul; mul.UnitMatrix();
 		for(unsigned int i = 0; i < dir.size(); i++){
 			direction = dir[i];
-			assert(direction < DIMN * 2 && direction > -2);
+			assert(direction < DIMN * 2 && direction > -1);
 			if(direction < DIMN){
 				if(i == d){
-					mul = mul * FmField.get_elems_const(y)[direction] 
+					mul = mul  * FmField.get_elems_const(y)[direction] * qlat::Complex(0., 1.) 
 								* FgField.get_elems_const(y)[direction];
 				}else{
 					mul = mul * FgField.get_elems_const(y)[direction];
@@ -204,8 +206,7 @@ inline cps::Matrix get_path_ordered_product_leftD(const Field<cps::Matrix>& FgFi
 			}else{
 				y[direction - DIMN]--;
 				if(i == d){
-					mul = mul * dagger(FmField.get_elems_const(y)[direction - DIMN] 
-								* FgField.get_elems_const(y)[direction - DIMN]);
+					mul = mul * dagger(FmField.get_elems_const(y)[direction - DIMN] * qlat::Complex(0., 1.) * FgField.get_elems_const(y)[direction - DIMN]);
 				}else{
 					mul = mul * dagger(FgField.get_elems_const(y)[direction - DIMN]);
 				}
