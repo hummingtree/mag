@@ -416,7 +416,7 @@ inline void get_Cforce(
 			U = get_U(FgField, 2*x, mu);
 			DQ = get_DQ(FgField, FmField, 2*x, mu, rho);
 			DU = get_path_ordered_product_leftD(FgField, FmField, 2*x, dir);
-			mTemp = (DQ*expiQ(Q)*U*i() + expiQ(Q)*DU) * dagger(expiQ(Q)*U);
+			mTemp = ( DexpiQ(Q, DQ)*U + expiQ(Q)*DU ) * dagger(expiQ(Q)*U);
 			// cps::Matrix old = mTemp;
 			// mTemp.TrLessAntiHermMatrix();
 			// qlat::Printf("%.12e\n", ((old-mTemp)*(old-mTemp)).ReTr());

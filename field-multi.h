@@ -44,6 +44,139 @@ inline cps::Matrix hermitian_traceless(const cps::Matrix& M){
 	return ((M+dg)-one*((M+dg).Tr()/3.))*0.5;
 }
 
+inline cps::Matrix expiQ(const cps::Matrix& Q){
+	// 	hep-lat/0311018
+	// Assuming Q is hermitian and traceless.
+	// static const double c1m = 9. *rho*rho* (69. + 11. * sqrt(33.)) / 32.;
+
+	cps::Matrix one; one.UnitMatrix();
+	double c0 = (Q * Q * Q).ReTr() / 3.;
+	bool reflect = false;
+	if(c0 < 0.){
+		c0 = -c0;
+		reflect = true;
+	}
+	double c1 = (Q * Q).ReTr() / 2.;
+	if(c1 == 0.) return one; 
+	double c0m = 2.* pow(c1/3., 1.5);
+	double theta = acos(c0/c0m);
+	double u = sqrt(c1/3.) * cos(theta/3.);
+	double w = sqrt(c1) * sin(theta/3.);
+
+	double xi0;
+	if(w*w < 0.05*0.05) xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
+	else xi0 = sin(w)/w;
+	qlat::Complex h0 = (u*u-w*w)*expix(2.*u) + expix(-u)*(8.*u*u*cos(w)+i()*2.*u*(3.*u*u+w*w)*xi0);
+	qlat::Complex h1 = 2.*u*expix(2.*u) - expix(-u)*(2.*u*cos(w)-i()*(3.*u*u-w*w)*xi0);
+	qlat::Complex h2 = expix(2.*u)-expix(-u)*(cos(w)+i()*3.*u*xi0);
+	qlat::Complex f0 = h0 / (9.*u*u-w*w);
+	qlat::Complex f1 = h1 / (9.*u*u-w*w);
+	qlat::Complex f2 = h2 / (9.*u*u-w*w);
+
+	if(reflect){
+		f0 = conj(f0);
+		f1 = -1. * conj(f1);
+		f2 = conj(f2);
+	}
+
+	// qlat::Printf("f0=%.12f\tf0=%.12f\n", f0.real(), f0.imag());	
+	// qlat::Printf("f1=%.12f\tf1=%.12f\n", f1.real(), f1.imag());	
+	// qlat::Printf("f2=%.12f\tf2=%.12f\n", f2.real(), f2.imag());	
+	
+
+	return one * f0 + Q * f1 + Q * Q * f2;
+}
+
+inline cps::Matrix DexpiQ(const cps::Matrix& Q, const cps::Matrix& DQ){
+	cps::Matrix one; one.UnitMatrix();
+	double c0 = (Q * Q * Q).ReTr() / 3.;
+	bool reflect = false;
+	if(c0 < 0.){
+		c0 = -c0;
+		reflect = true;
+	}
+	double c1 = (Q * Q).ReTr() / 2.;
+	cps::Matrix zero; zero.ZeroMatrix();
+	if(c1 == 0) return zero;
+	double c0m = 2.* pow(c1/3., 1.5);
+	double theta = acos(c0/c0m);
+	double u = sqrt(c1/3.) * cos(theta/3.);
+	double w = sqrt(c1) * sin(theta/3.);
+
+	// qlat::Printf("u=%.12f\tw=%.12f\n", u, w);	
+
+	double xi0;
+	double xi1;
+	if(w*w < 0.05*0.05){
+		xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
+		xi1 = -1./2.*(1.-w*w/12.*(1.-w*w/30.)) + 1./6.*(1.-w*w/20.*(1.-w*w/42.));
+	}
+	else{
+		xi0 = sin(w)/w;
+		xi1 = cos(w)/(w*w)-sin(w)/(w*w*w);
+	}
+	qlat::Complex h0 = (u*u-w*w)*expix(2.*u) + expix(-u)*(8.*u*u*cos(w)+i()*2.*u*(3.*u*u+w*w)*xi0);
+	qlat::Complex h1 = 2.*u*expix(2.*u) - expix(-u)*(2.*u*cos(w)-i()*(3.*u*u-w*w)*xi0);
+	qlat::Complex h2 = expix(2.*u)-expix(-u)*(cos(w)+i()*3.*u*xi0);
+	qlat::Complex f0 = h0 / (9.*u*u-w*w);
+	qlat::Complex f1 = h1 / (9.*u*u-w*w);
+	qlat::Complex f2 = h2 / (9.*u*u-w*w);
+
+	qlat::Complex r01 = 2.*( u + i()*(u*u-w*w) ) * expix(2.*u) + 
+						2.*expix(-u)*( 
+										4.*u*(2.-i()*u)*cos(w) + 
+										i()*xi0*( 9.*u*u + w*w - i()*u*(3.*u*u+w*w) )
+						);
+
+	qlat::Complex r11 = 2.*( 1.+2.*i()*u ) * expix(2.*u) + 
+						expix(-u)*( 
+									-2.*(1.-i()*u)*cos(w) + 
+									i()*xi0*(6.*u+i()*(w*w-3.*u*u)) 
+						);
+
+	qlat::Complex r21 = 2.*i()*expix(2.*u) + 
+						i()*expix(-u)*( cos(w)-3.*xi0*(1.-i()*u) );
+
+	qlat::Complex r02 = -2.*expix(2.*u) + 
+						2.*i()*u*expix(-u)*( cos(w) + (1.+4.*i()*u)*xi0 + 3.*u*u*xi1 );
+	qlat::Complex r12 = -i()*expix(-u) * ( 
+											cos(w) 
+											+ (1.+2.*i()*u)*xi0 
+											- 3.*u*u*xi1 
+						);
+	qlat::Complex r22 = expix(-u) * (xi0 - 3.*i()*u*xi1);
+
+	qlat::Complex b10 = (2.*u*r01 + (3.*u*u-w*w)*r02 - 2.*(15.*u*u+w*w)*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b11 = (2.*u*r11 + (3.*u*u-w*w)*r12 - 2.*(15.*u*u+w*w)*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b12 = (2.*u*r21 + (3.*u*u-w*w)*r22 - 2.*(15.*u*u+w*w)*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+
+	qlat::Complex b20 = (r01 - 3.*u*r02 - 24.*u*f0) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b21 = (r11 - 3.*u*r12 - 24.*u*f1) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+	qlat::Complex b22 = (r21 - 3.*u*r22 - 24.*u*f2) / ( 2.*(9.*u*u-w*w)*(9.*u*u-w*w) );
+
+	if(reflect){
+		f0 = conj(f0);
+		f1 = -conj(f1);
+		f2 = conj(f2);
+	
+		b10 = conj(b10);
+		b11 = -conj(b11);
+		b12 = conj(b12);
+		b20 = -conj(b20);
+		b21 = conj(b21);
+		b22 = -conj(b22);
+	}
+
+	// qlat::Printf("f0=%.12f\tf0=%.12f\n", f0.real(), f0.imag());	
+	// qlat::Printf("f1=%.12f\tf1=%.12f\n", f1.real(), f1.imag());	
+	// qlat::Printf("f2=%.12f\tf2=%.12f\n", f2.real(), f2.imag());	
+	
+	cps::Matrix B1 = one * b10 + Q * b11 + Q * Q * b12;
+	cps::Matrix B2 = one * b20 + Q * b21 + Q * Q * b22;
+
+	return B1 * (Q*DQ).Tr() + B2 * (Q*Q*DQ).Tr() + DQ*f1 + DQ*Q*f2 + Q*DQ*f2;
+}
+
 inline cps::Matrix compute_Lambda(const cps::Matrix& Q, const cps::Matrix& SigmaP, const cps::Matrix& U){
 	cps::Matrix one; one.UnitMatrix();
 	double c0 = (Q * Q * Q).ReTr() / 3.;
