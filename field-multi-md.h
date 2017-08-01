@@ -436,6 +436,166 @@ inline void get_Cforce(
 //	evolve_gauge_field(CgField, CmField, dt, arg);
 //}
 //
+//
+
+inline void force_gradient_integrator_zeta_T( // zeta_T = zeta_f + zeta_c 
+	Field<cps::Matrix>& FgField, 
+	Field<cps::Matrix>& FmField, 
+	Chart<cps::Matrix>& Fchart,
+	Field<cps::Matrix>& CgField, 
+	Field<cps::Matrix>& CmField, 
+	double dt, const Arg_chmc& Farg 
+){
+	// See mag.pdf for notations.
+
+	sync_node();
+	TIMER("fg_integrator_zeta_T()"); 
+
+	const double alpha = 1./6.;
+	const double beta = 2./3.;
+
+	fetch_expanded_chart(FmField, Fchart);
+	
+	evolve_gauge_field(FgField, FmField, alpha*dt, Farg);
+	
+	fetch_expanded_chart(FgField, Fchart);
+	get_Cforce(CmField, FgField, FmField);
+	evolve_gauge_field(CgField, CmField, 0.5*dt, Farg);
+
+	evolve_gauge_field(FgField, FmField, beta*dt, Farg);
+	
+	fetch_expanded_chart(FgField, Fchart);
+	get_Cforce(CmField, FgField, FmField);
+	evolve_gauge_field(CgField, CmField, 0.5*dt, Farg);
+
+	evolve_gauge_field(FgField, FmField, alpha*dt, Farg);
+
+//	qlat::Printf("reunitarize FgField: max deviation = %.8e\n", reunitarize(FgField));
+//	qlat::Printf("reunitarize CgField: max deviation = %.8e\n", reunitarize(CgField));
+}
+
+inline void force_gradient_integrator_zeta_H( // This is integrator is not supposed to be nested.
+											 // Use a variant of the force gradient integrator
+	Field<cps::Matrix>& FgField, Field<cps::Matrix>& FmField, 
+	Field<cps::Matrix>& FgFieldAuxil, Field<cps::Matrix>& FfField,
+	const Arg_chmc& Farg, 
+	Chart<cps::Matrix>& Fchart,
+	Field<cps::Matrix>& CgField, Field<cps::Matrix>& CmField, 
+	Field<cps::Matrix>& CgFieldAuxil, Field<cps::Matrix>& CfField,
+	Chart<cps::Matrix>& Cchart,
+	Field<double>& CxField
+){
+	// See mag.pdf for notations.
+
+	sync_node();
+	TIMER("fg_integrator_zeta_H()"); 
+
+	assert(is_matching_geo(FgField.geo, FmField.geo));
+	assert(is_matching_geo(FgField.geo, FfField.geo));
+	assert(is_matching_geo(FgField.geo, FgFieldAuxil.geo));
+	assert(is_matching_geo(CgField.geo, CmField.geo));
+	assert(is_matching_geo(CgField.geo, CfField.geo));
+	assert(is_matching_geo(CgField.geo, CgFieldAuxil.geo));
+	assert(is_matching_geo(CgField.geo, CxField.geo));
+	
+	const double alpha = (3.-sqrt(3.))*Farg.dt/6.;
+	const double beta = Farg.dt/sqrt(3.);
+	const double gamma = (2.-sqrt(3.))*Farg.dt*Farg.dt/12.;
+
+//	fetch_expanded_chart(FgField, Fchart);
+//	fetch_expanded_chart(FmField, Fchart);
+//	get_Cforce(CmField, FgField, FmField);
+//	evolve_gauge_field(FgField, FmField, alpha, Farg);
+//	evolve_gauge_field(CgField, CmField, alpha, Farg);
+
+	force_gradient_integrator_zeta_T(FgField, FmField, Fchart, CgField, CmField, alpha, Farg);
+
+	sync_node();
+	for(int i = 0; i < Farg.trajectory_length; i++){
+
+		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded_chart(CgField, Cchart);
+		// TODO!!!
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgField, CgField, Farg, CxField);
+		FgFieldAuxil = FgField;
+		CgFieldAuxil = CgField;
+		
+//		fetch_expanded_chart(FfField, Fchart);
+//		get_Cforce(CfField, FgField, FfField);
+//		evolve_gauge_field(FgFieldAuxil, FfField, gamma, Farg);
+//		evolve_gauge_field(CgFieldAuxil, CfField, gamma, Farg);
+		
+		force_gradient_integrator_zeta_T(FgFieldAuxil, FfField, Fchart, CgFieldAuxil, CmField, gamma, Farg);
+		
+		fetch_expanded_chart(FgFieldAuxil, Fchart);
+		fetch_expanded_chart(CgFieldAuxil, Cchart);
+		// TODO!!!
+
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart, CxField);
+		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
+	
+//		get_Fforce(FfField, FgField, CgFieldAuxil, Farg, Cchart, CxField);
+//		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
+
+// -----------		
+
+//		fetch_expanded_chart(FgField, Fchart);
+//		fetch_expanded_chart(FmField, Fchart);
+//		get_Cforce(CmField, FgField, FmField);
+//		evolve_gauge_field(FgField, FmField, beta, Farg);
+//		evolve_gauge_field(CgField, CmField, beta, Farg);
+
+		force_gradient_integrator_zeta_T(FgField, FmField, Fchart, CgField, CmField, beta, Farg);
+
+// -----------		
+		fetch_expanded_chart(FgField, Fchart);
+		fetch_expanded_chart(CgField, Cchart);
+		// TODO!!!
+		get_Fforce(FfField, FgField, CgField, Farg, Cchart, CxField);
+//		get_Cforce(CfField, FgField, CgField, Farg, CxField);
+		FgFieldAuxil = FgField;
+		CgFieldAuxil = CgField;
+		
+//		fetch_expanded_chart(FfField, Fchart);
+//		get_Cforce(CfField, FgField, FfField);
+//		evolve_gauge_field(FgFieldAuxil, FfField, gamma, Farg);
+//		evolve_gauge_field(CgFieldAuxil, CfField, gamma, Farg);
+		
+		force_gradient_integrator_zeta_T(FgFieldAuxil, FfField, Fchart, CgFieldAuxil, CmField, gamma, Farg);
+		
+		fetch_expanded_chart(FgFieldAuxil, Fchart);
+		fetch_expanded_chart(CgFieldAuxil, Cchart);
+		// TODO!!!
+
+		get_Fforce(FfField, FgFieldAuxil, CgFieldAuxil, Farg, Cchart, CxField);
+		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
+	
+//		get_Fforce(FfField, FgField, CgFieldAuxil, Farg, Cchart, CxField);
+//		evolve_momentum(FmField, FfField, 0.5 * Farg.dt, Farg);
+	
+		if(i < Farg.trajectory_length - 1){
+//			fetch_expanded_chart(FgField, Fchart);
+//			fetch_expanded_chart(FmField, Fchart);
+//			get_Cforce(CmField, FgField, FmField);
+//			evolve_gauge_field(FgField, FmField, 2.*alpha, Farg);
+//			evolve_gauge_field(CgField, CmField, 2.*alpha, Farg);
+			force_gradient_integrator_zeta_T(FgField, FmField, Fchart, CgField, CmField, 2.*alpha, Farg);
+		} 
+		else{
+//			fetch_expanded_chart(FgField, Fchart);
+//			fetch_expanded_chart(FmField, Fchart);
+//			get_Cforce(CmField, FgField, FmField);
+//			evolve_gauge_field(FgField, FmField, alpha, Farg);
+//			evolve_gauge_field(CgField, CmField, alpha, Farg);
+			force_gradient_integrator_zeta_T(FgField, FmField, Fchart, CgField, CmField, alpha, Farg);
+		}
+	}
+
+	qlat::Printf("reunitarize FgField: max deviation = %.8e\n", reunitarize(FgField));
+	qlat::Printf("reunitarize CgField: max deviation = %.8e\n", reunitarize(CgField));
+}
+
 inline void force_gradient_integrator(
 	Field<cps::Matrix>& FgField, 
 	Field<cps::Matrix>& FmField, 
@@ -716,10 +876,10 @@ inline void run_hmc_multi(
 
 		// TODO!!!
 		old_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, Cchart, CxField, old_energy_partition);
-//		force_gradient_integrator_multi(FgField, FmField, FgField_auxil, FfField, Farg, Fchart,
-//										CgField, CmField, CgField_auxil, CfField, Cchart, CxField);
-		nested_integrator(FgField, FmField, FgField_auxil, FfField, Farg, Fchart,
-							CgField, CmField, Cchart, CxField);
+		force_gradient_integrator_zeta_H(FgField, FmField, FgField_auxil, FfField, Farg, Fchart,
+										CgField, CmField, CgField_auxil, CfField, Cchart, CxField);
+//		nested_integrator(FgField, FmField, FgField_auxil, FfField, Farg, Fchart,
+//							CgField, CmField, Cchart, CxField);
 		new_hamiltonian = get_hamiltonian_multi(FgField, FmField, Farg, Fchart, CgField, Cchart, CxField, new_energy_partition);
 	
 		die_roll = u_rand_gen(globalRngState);
