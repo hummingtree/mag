@@ -25,7 +25,7 @@ using namespace std;
 
 namespace md { // This a variant of the original functions.
 
-static const double md_alpha = -0.5;
+static const double md_alpha = -1.25;
 
 inline double get_xi_energy(
 	Field<cps::Matrix>& FgField, 
@@ -710,7 +710,7 @@ inline void init_xi(
 		qlat::Coordinate x = CxField.geo.coordinate_from_index(index);
 		qlat::Vector<double> xx = CxField.get_elems(x);
 		for(int mu = 0; mu < DIMN; mu++){
-			xx[mu] = 12.5;
+			xx[mu] = XI0;
 	}}
 
 //#pragma omp parallel for
@@ -746,16 +746,16 @@ inline void init_xi(
 }
 
 inline void simplest_metropolis(cps::Matrix& var, const cps::Matrix& env, double coeff, RngState& rng){
-	cps::Matrix new_var = var * random_su3_from_su2(0.1, rng); // small = 0.1
+	cps::Matrix new_var = var * random_su3_from_su2(0.8, rng); // small = 0.8
+	// TODO!!! should change the interface.
 	double diff = coeff*(new_var*dagger(env)-var*dagger(env)).ReTr();
-	for(int i = 0; i < 6; i++){ // number of hits = 6
-		if(u_rand_gen(rng, 1., 0.) < std::exp(diff)){
-			var = new_var;
-		}
+	if(u_rand_gen(rng, 1., 0.) < std::exp(diff)){
+		var = new_var;
 	}
 }
 
 inline void heatbath(Field<cps::Matrix>& CgField, Field<cps::Matrix>& FgField, RngField& rng_field){
+	// assumming properly communicated.
 #pragma omp parallel for
 	for(long index = 0; index < CgField.geo.local_volume(); index++){
 		qlat::Coordinate x = CgField.geo.coordinate_from_index(index);
@@ -764,7 +764,7 @@ inline void heatbath(Field<cps::Matrix>& CgField, Field<cps::Matrix>& FgField, R
 		for(int mu = 0; mu < DIMN; mu++){
 			Q = get_Q(FgField, 2*x, mu, rho);
 			U = get_U(FgField, 2*x, mu);
-			simplest_metropolis(gx[mu], expiQ(Q)*U, (1.+md_alpha)*12.5, rng_field.get_elem(x));
+			simplest_metropolis(gx[mu], expiQ(Q)*U, (1.+md_alpha)*XI0, rng_field.get_elem(x));
 	}}
 }
 
@@ -863,6 +863,7 @@ inline void run_hmc_multi(
 		init_momentum(FmField, Frng_field);
 //		should do Metropolis for CgField.
 		
+		fetch_expanded_chart(FgField, Fchart);
 		heatbath(CgField, FgField, Crng_field);
 
 		fetch_expanded(CgField);
@@ -946,15 +947,15 @@ inline void run_hmc_multi(
 				address = Farg.export_dir_stem + "/ckpoint_Clat." + show(i + 1);
 				export_config_nersc(CgField_ext, address, arg_export, true);
 				
-				address = Farg.export_dir_stem + "/ckpoint_Xlat." + show(i + 1);
-				qlat::Field<double> X_output; X_output.init(CxField.geo);
-				qlat::sophisticated_make_to_order(X_output, CxField);
-				qlat::sophisticated_serial_write(X_output, address);
-				
-				address = Farg.export_dir_stem + "/ckpoint_Blat." + show(i + 1);
-				qlat::Field<double> B_output; B_output.init(CbField.geo);
-				qlat::sophisticated_make_to_order(B_output, CbField);
-				qlat::sophisticated_serial_write(B_output, address);
+//				address = Farg.export_dir_stem + "/ckpoint_Xlat." + show(i + 1);
+//				qlat::Field<double> X_output; X_output.init(CxField.geo);
+//				qlat::sophisticated_make_to_order(X_output, CxField);
+//				qlat::sophisticated_serial_write(X_output, address);
+//				
+//				address = Farg.export_dir_stem + "/ckpoint_Blat." + show(i + 1);
+//				qlat::Field<double> B_output; B_output.init(CbField.geo);
+//				qlat::sophisticated_make_to_order(B_output, CbField);
+//				qlat::sophisticated_serial_write(B_output, address);
 
 			}
 			
