@@ -44,48 +44,48 @@ inline cps::Matrix hermitian_traceless(const cps::Matrix& M){
 	return ((M+dg)-one*((M+dg).Tr()/3.))*0.5;
 }
 
-inline cps::Matrix expiQ(const cps::Matrix& Q){
-	// 	hep-lat/0311018
-	// Assuming Q is hermitian and traceless.
-	// static const double c1m = 9. *rho*rho* (69. + 11. * sqrt(33.)) / 32.;
-
-	cps::Matrix one; one.UnitMatrix();
-	double c0 = (Q * Q * Q).ReTr() / 3.;
-	bool reflect = false;
-	if(c0 < 0.){
-		c0 = -c0;
-		reflect = true;
-	}
-	double c1 = (Q * Q).ReTr() / 2.;
-	if(c1 == 0.) return one; 
-	double c0m = 2.* pow(c1/3., 1.5);
-	double theta = acos(c0/c0m);
-	double u = sqrt(c1/3.) * cos(theta/3.);
-	double w = sqrt(c1) * sin(theta/3.);
-
-	double xi0;
-	if(w*w < 0.05*0.05) xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
-	else xi0 = sin(w)/w;
-	qlat::Complex h0 = (u*u-w*w)*expix(2.*u) + expix(-u)*(8.*u*u*cos(w)+i()*2.*u*(3.*u*u+w*w)*xi0);
-	qlat::Complex h1 = 2.*u*expix(2.*u) - expix(-u)*(2.*u*cos(w)-i()*(3.*u*u-w*w)*xi0);
-	qlat::Complex h2 = expix(2.*u)-expix(-u)*(cos(w)+i()*3.*u*xi0);
-	qlat::Complex f0 = h0 / (9.*u*u-w*w);
-	qlat::Complex f1 = h1 / (9.*u*u-w*w);
-	qlat::Complex f2 = h2 / (9.*u*u-w*w);
-
-	if(reflect){
-		f0 = conj(f0);
-		f1 = -1. * conj(f1);
-		f2 = conj(f2);
-	}
-
-	// qlat::Printf("f0=%.12f\tf0=%.12f\n", f0.real(), f0.imag());	
-	// qlat::Printf("f1=%.12f\tf1=%.12f\n", f1.real(), f1.imag());	
-	// qlat::Printf("f2=%.12f\tf2=%.12f\n", f2.real(), f2.imag());	
-	
-
-	return one * f0 + Q * f1 + Q * Q * f2;
-}
+//inline cps::Matrix expiQ(const cps::Matrix& Q){
+//	// 	hep-lat/0311018
+//	// Assuming Q is hermitian and traceless.
+//	// static const double c1m = 9. *rho*rho* (69. + 11. * sqrt(33.)) / 32.;
+//
+//	cps::Matrix one; one.UnitMatrix();
+//	double c0 = (Q * Q * Q).ReTr() / 3.;
+//	bool reflect = false;
+//	if(c0 < 0.){
+//		c0 = -c0;
+//		reflect = true;
+//	}
+//	double c1 = (Q * Q).ReTr() / 2.;
+//	if(c1 == 0.) return one; 
+//	double c0m = 2.* pow(c1/3., 1.5);
+//	double theta = acos(c0/c0m);
+//	double u = sqrt(c1/3.) * cos(theta/3.);
+//	double w = sqrt(c1) * sin(theta/3.);
+//
+//	double xi0;
+//	if(w*w < 0.05*0.05) xi0 = 1.-w*w/6.*(1.-w*w/20.*(1.-w*w/42.));
+//	else xi0 = sin(w)/w;
+//	qlat::Complex h0 = (u*u-w*w)*expix(2.*u) + expix(-u)*(8.*u*u*cos(w)+i()*2.*u*(3.*u*u+w*w)*xi0);
+//	qlat::Complex h1 = 2.*u*expix(2.*u) - expix(-u)*(2.*u*cos(w)-i()*(3.*u*u-w*w)*xi0);
+//	qlat::Complex h2 = expix(2.*u)-expix(-u)*(cos(w)+i()*3.*u*xi0);
+//	qlat::Complex f0 = h0 / (9.*u*u-w*w);
+//	qlat::Complex f1 = h1 / (9.*u*u-w*w);
+//	qlat::Complex f2 = h2 / (9.*u*u-w*w);
+//
+//	if(reflect){
+//		f0 = conj(f0);
+//		f1 = -1. * conj(f1);
+//		f2 = conj(f2);
+//	}
+//
+//	// qlat::Printf("f0=%.12f\tf0=%.12f\n", f0.real(), f0.imag());	
+//	// qlat::Printf("f1=%.12f\tf1=%.12f\n", f1.real(), f1.imag());	
+//	// qlat::Printf("f2=%.12f\tf2=%.12f\n", f2.real(), f2.imag());	
+//	
+//
+//	return one * f0 + Q * f1 + Q * Q * f2;
+//}
 
 inline cps::Matrix DexpiQ(const cps::Matrix& Q, const cps::Matrix& DQ){
 	cps::Matrix one; one.UnitMatrix();

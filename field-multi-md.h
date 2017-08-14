@@ -25,7 +25,7 @@ using namespace std;
 
 namespace md { // This a variant of the original functions.
 
-static const double md_alpha = -1.25;
+static const double md_alpha = -1.05;
 
 inline double get_xi_energy(
 	Field<cps::Matrix>& FgField, 
@@ -746,7 +746,7 @@ inline void init_xi(
 }
 
 inline void simplest_metropolis(cps::Matrix& var, const cps::Matrix& env, double coeff, RngState& rng){
-	cps::Matrix new_var = var * random_su3_from_su2(0.8, rng); // small = 0.8
+	cps::Matrix new_var = var * random_su3_from_su2(0.8, rng); // small = 0.6
 	// TODO!!! should change the interface.
 	double diff = coeff*(new_var*dagger(env)-var*dagger(env)).ReTr();
 	if(u_rand_gen(rng, 1., 0.) < std::exp(diff)){
