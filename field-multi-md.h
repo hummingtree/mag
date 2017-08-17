@@ -25,7 +25,7 @@ using namespace std;
 
 namespace md { // This a variant of the original functions.
 
-static const double md_alpha = -1.05;
+static const double md_alpha = -0.5;
 
 inline double get_xi_energy(
 	Field<cps::Matrix>& FgField, 
@@ -746,7 +746,7 @@ inline void init_xi(
 }
 
 inline void simplest_metropolis(cps::Matrix& var, const cps::Matrix& env, double coeff, RngState& rng){
-	cps::Matrix new_var = var * random_su3_from_su2(0.8, rng); // small = 0.6
+	cps::Matrix new_var = var * random_su3_from_su2(0.9, rng); // small = 0.9
 	// TODO!!! should change the interface.
 	double diff = coeff*(new_var*dagger(env)-var*dagger(env)).ReTr();
 	if(u_rand_gen(rng, 1., 0.) < std::exp(diff)){
@@ -765,6 +765,20 @@ inline void heatbath(Field<cps::Matrix>& CgField, Field<cps::Matrix>& FgField, R
 			Q = get_Q(FgField, 2*x, mu, rho);
 			U = get_U(FgField, 2*x, mu);
 			simplest_metropolis(gx[mu], expiQ(Q)*U, (1.+md_alpha)*XI0, rng_field.get_elem(x));
+	}}
+}
+
+inline void get_Gb(Field<cps::Matrix>& CGbField, Field<cps::Matrix>& FgField){
+	// assumming properly communicated.
+#pragma omp parallel for
+	for(long index = 0; index < CGbField.geo.local_volume(); index++){
+		qlat::Coordinate x = CGbField.geo.coordinate_from_index(index);
+		qlat::Vector<cps::Matrix> Gbx = CGbField.get_elems(x);
+		cps::Matrix Q, U;
+		for(int mu = 0; mu < DIMN; mu++){
+			Q = get_Q(FgField, 2*x, mu, rho);
+			U = get_U(FgField, 2*x, mu);
+			Gbx[mu] = expiQ(Q)*U;
 	}}
 }
 
@@ -823,6 +837,7 @@ inline void run_hmc_multi(
 	Field<cps::Matrix> CgField_auxil; CgField_auxil.init(Cgeo_expanded);
 	Field<cps::Matrix> CmField; CmField.init(Cgeo_expanded);
 	Field<cps::Matrix> CfField; CfField.init(Cgeo_expanded);
+	Field<cps::Matrix> CGbField; CGbField.init(Cgeo_expanded);
 	Field<double> CxField; CxField.init(Cgeo_expanded); // xi field
 	Field<double> CbField; CbField.init(Cgeo_expanded); // xi field
 
@@ -862,9 +877,11 @@ inline void run_hmc_multi(
 
 		init_momentum(FmField, Frng_field);
 //		should do Metropolis for CgField.
-		
-		fetch_expanded_chart(FgField, Fchart);
-		heatbath(CgField, FgField, Crng_field);
+	
+		if(i % 5 == 0){
+			fetch_expanded_chart(FgField, Fchart);
+			heatbath(CgField, FgField, Crng_field);
+		}
 
 		fetch_expanded(CgField);
 		fetch_expanded(FgField);
@@ -872,7 +889,7 @@ inline void run_hmc_multi(
     	qlat::Printf("COARSE Plaquette = %.12f\n", avg_plaquette(CgField));	
 
 //		init_momentum(CmField, Crng_field, M);
-	
+
 		init_xi(CxField, FgField, CgField, Fchart, Crng_field, CbField);
 
 		// TODO!!!
@@ -935,6 +952,8 @@ inline void run_hmc_multi(
 			Fflush(p);
 		}
 
+		get_Gb(CGbField, FgField);
+
 		if((i+1) % Farg.num_step_between_output == 0 && i+1 >= Farg.num_step_before_output){
 			Arg_export arg_export;
 			arg_export.beta = 			Farg.beta;
@@ -946,6 +965,8 @@ inline void run_hmc_multi(
 				export_config_nersc(FgField_ext, address, arg_export, true);
 				address = Farg.export_dir_stem + "/ckpoint_Clat." + show(i + 1);
 				export_config_nersc(CgField_ext, address, arg_export, true);
+				address = Farg.export_dir_stem + "/ckpoint_Gblat." + show(i + 1);
+				export_config_nersc(CGbField, address, arg_export, true);
 				
 //				address = Farg.export_dir_stem + "/ckpoint_Xlat." + show(i + 1);
 //				qlat::Field<double> X_output; X_output.init(CxField.geo);
