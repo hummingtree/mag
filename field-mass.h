@@ -17,13 +17,15 @@
 #include "field-matrix.h"
 #include <cmath>
 
-#include "field-mass.h"
+#include "field-hmc.h"
 
 using namespace cps;
 using namespace qlat;
 using namespace std;
 
 namespace mass {
+
+const double MASS = 1.;
 
 inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gField,
 			const Arg_chmc &arg){
@@ -53,15 +55,11 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
 					break;
 				}
-				case 100: mTemp.ZeroMatrix(); break;
-			
-			// 	test case start
-			// 	case 100: {
-			// 		get_staple_dagger(mStaple1, gField, x, mu);
-			// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
-			// 		break;
-			// 	} 
-		 	// 	test case end
+			 	case 100: {
+			 		get_staple_dagger(mStaple1, gField, x, mu);
+			 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1. * MASS;
+			 		break;
+			 	} 
 		
 			 	default: assert(false);
 				}
@@ -93,15 +91,11 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 					mTemp = gField.get_elems_const(y)[mu] * mStaple2 - mStaple1 * gx[mu];
 					break;
 				}
-				case 100: mTemp.ZeroMatrix(); break;
-			
-			// 	test case start
-			// 	case 100: {
-			// 		get_staple_dagger(mStaple1, gField, x, mu);
-			// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
-			// 		break;
-			// 	} 
-		 	// 	test case end
+			 	case 100: {
+			 		get_staple_dagger(mStaple1, gField, x, mu);
+			 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1. * MASS;
+			 		break;
+			 	} 
 		
 			 	default: assert(false);
 				}
@@ -133,7 +127,7 @@ inline void evolve_gauge_field(Field<cps::Matrix> &gField,
 				gx[mu] = mL * gx[mu];
 				break;
 			}
-			// case 100: // test case
+			case 100:
 			case 1: {
 				algebra_to_group(mL, mField.get_elems_const(y)[mu] * dt);
 				algebra_to_group(mR, mx[mu] * -dt);
@@ -143,13 +137,13 @@ inline void evolve_gauge_field(Field<cps::Matrix> &gField,
 			case 10: {
 				algebra_to_group(mR, mx[mu] * -dt);
 				gx[mu] = gx[mu] * mR;
-			break;
-			}
-			case 100: {
-				algebra_to_group(mL, mField.get_elems_const(y)[mu] * dt);
-				gx[mu] = mL * gx[mu];
 				break;
 			}
+//			case 100: {
+//				algebra_to_group(mL, mField.get_elems_const(y)[mu] * dt);
+//				gx[mu] = mL * gx[mu];
+//				break;
+//			}
 			default: assert(false);
 			}
 	}}
@@ -168,30 +162,30 @@ inline void force_gradient_integrator(Field<cps::Matrix> &gField, Field<cps::Mat
 	static Field<cps::Matrix> gFieldAuxil; gFieldAuxil.init(gField.geo);
 	static Field<cps::Matrix> fField; fField.init(mField.geo);
 
-	evolve_gauge_field(gField, mField, alpha, arg);
+	mass::evolve_gauge_field(gField, mField, alpha, arg);
 	
 	for(int i = 0; i < arg.trajectory_length; i++){
 		fetch_expanded_chart(gField, chart);
-		get_force(fField, gField, arg);
+		mass::get_force(fField, gField, arg);
 		gFieldAuxil = gField;
-		evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
+		mass::evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
 		fetch_expanded_chart(gFieldAuxil, chart);
-		get_force(fField, gFieldAuxil, arg);
+		mass::get_force(fField, gFieldAuxil, arg);
 		evolve_momentum(mField, fField, 0.5 * arg.dt, arg);
 
-		evolve_gauge_field(gField, mField, beta, arg);
+		mass::evolve_gauge_field(gField, mField, beta, arg);
 	
 		fetch_expanded_chart(gField, chart);
-		get_force(fField, gField, arg);
+		mass::get_force(fField, gField, arg);
 		gFieldAuxil = gField;
-		evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
+		mass::evolve_gauge_field(gFieldAuxil, fField, gamma, arg);
 		fetch_expanded_chart(gFieldAuxil, chart);
-		get_force(fField, gFieldAuxil, arg);
+		mass::get_force(fField, gFieldAuxil, arg);
 		evolve_momentum(mField, fField, 0.5 * arg.dt, arg);
 
 		if(i < arg.trajectory_length - 1) 
-			evolve_gauge_field(gField, mField, 2. * alpha, arg);
-		else evolve_gauge_field(gField, mField, alpha, arg);
+			mass::evolve_gauge_field(gField, mField, 2. * alpha, arg);
+		else mass::evolve_gauge_field(gField, mField, alpha, arg);
 	}
 	qlat::Printf("reunitarize: max deviation = %.8e\n", reunitarize(gField));
 }
@@ -217,8 +211,10 @@ inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matri
 		const qlat::Vector<cps::Matrix> mx = mField.get_elems_const(x);
 		for(int mu = 0; mu < DIMN; mu++){
 			switch(is_constrained(x, mu, arg.mag)){
-				case 100: break;
-				// case 100: // test case
+				case 100: {
+					pLocalSum += (mx[mu] * mx[mu]).ReTr() / MASS;
+					break;
+				}
 				case 0:
 				case 1:
 				case 10:{
@@ -245,15 +241,17 @@ inline double get_hamiltonian(Field<cps::Matrix> &gField, const Field<cps::Matri
 	if(arg.gauge.type == IWASAKI){
 		double p1 = -total_plaq(gField);
 		double p2 = -total_rectangular(gField);
-		potential_energy = (p1 * (1. - 8. * arg.gauge.c1) + p2 * arg.gauge.c1) 
-																* arg.beta / 3.;
+		potential_energy = (p1 * (1. - 8. * arg.gauge.c1) + p2 * arg.gauge.c1) * arg.beta / 3.;
 	}
 	part.resize(2);
 	part[0] = kineticEnergy; part[1] = potential_energy;
+
+	qlat::Printf("energy partition: %.12f\t%.12f\n", part[0], part[1]);
+	
 	return kineticEnergy + potential_energy;
 }
 
-inline void init_momentum(Field<cps::Matrix> &mField, double m = 1.){
+inline void init_momentum(Field<cps::Matrix> &mField, const Arg_chmc &arg){
 	TIMER("init_momentum()");
 
 	using namespace qlat;
@@ -266,14 +264,27 @@ inline void init_momentum(Field<cps::Matrix> &mField, double m = 1.){
 		initialized = true;
 	}
 
-	double sig = std::sqrt(m);
-
 #pragma omp parallel for
 	for(long index = 0; index < mField.geo.local_volume(); index++){
 		qlat::Coordinate x = mField.geo.coordinate_from_index(index);
 		qlat::Vector<cps::Matrix> mx = mField.get_elems(x);
 		cps::Matrix mTemp;
 		for(int mu = 0; mu < mField.geo.multiplicity; mu++){
+			double sig;
+			switch(is_constrained(x, mu, arg.mag)){
+				case 0:
+				case 1:
+				case 10: {
+					sig = 1.;
+					break;
+				}
+			 	case 100: {
+			 		sig = sqrt(MASS);
+					break;
+			 	} 
+		
+			 	default: assert(false);
+			}
 			mTemp.ZeroMatrix();
 			for(int a = 0; a < SU3_NUM_OF_GENERATORS; a++){
 				mTemp += su3_generators[a] * g_rand_gen(rng_field.get_elem(x), 0., sig);
@@ -282,9 +293,9 @@ inline void init_momentum(Field<cps::Matrix> &mField, double m = 1.){
 	}}
 }
 
-inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *pFile){
+inline void run_hmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg){
 	TIMER("run_chmc()");
-	if(!get_id_node()) assert(pFile != NULL);
+	
 	assert(arg.num_trajectory > 20);
 
 	RngState globalRngState("By the witness of the martyrs.");
@@ -297,17 +308,6 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 
 	Chart<cps::Matrix> chart;
 	produce_chart_envelope(chart, gFieldExt.geo, arg.gauge);
-
-	qlat::Coordinate total_size_coarse;
-	for(int i = 0; i < DIMN; i++){
-		total_size_coarse[i] = geoLocal.total_site()[i] / arg.mag;
-	}
-	Geometry geo_coarse; 
-	geo_coarse.init(total_size_coarse, DIMN * SU3_NUM_OF_GENERATORS);
-	Field<double> dField; dField.init(geo_coarse);
-
-//	long alpha_size = product(gFieldExt.geo.node_site) * DIMN * SU3_NUM_OF_GENERATORS;
-//	vector<vector<double> > dev_list; dev_list.resize(alpha_size);
 
 	double oldH, newH;
 	double dieRoll;
@@ -322,13 +322,13 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 		
 		qlat::Printf("---------- START OF TRAJECTORY %5d --------\n", i+1);
 		
-		init_momentum(mField);
+		mass::init_momentum(mField, arg);
 		
-		oldH = get_hamiltonian(gField, mField, arg, chart, energy_partition_old);
+		oldH = mass::get_hamiltonian(gField, mField, arg, chart, energy_partition_old);
 		// leapFrogIntegrator(gField, mField, arg);
-		force_gradient_integrator(gField, mField, arg, chart);
+		mass::force_gradient_integrator(gField, mField, arg, chart);
 		
-		newH = get_hamiltonian(gField, mField, arg, chart, energy_partition_new);
+		newH = mass::get_hamiltonian(gField, mField, arg, chart, energy_partition_new);
 	
 		dieRoll = u_rand_gen(globalRngState);
 		deltaH = newH - oldH;
@@ -361,7 +361,6 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 		qlat::Printf("Old Hamiltonian =\t%+.12e\n", oldH);
 		qlat::Printf("New Hamiltonian =\t%+.12e\n", newH);
 		qlat::Printf("Delta H         =\t%+.12e\n", deltaH); 
-		qlat::Printf("Delta H Ratio   =\t%+.12e\n", percentDeltaH); 
 		qlat::Printf("exp(-Delta H)   =\t%12.6f\n", acceptProbability);
 		qlat::Printf("Die Roll        =\t%12.6f\n", dieRoll); 	
 	
@@ -374,10 +373,10 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 //		double dv_sum = derivative_sum(gField, arg);
 //		report << "FINE DERIVATIVE SUM =\t" << dv_sum << endl;
 
-		Fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
-				i + 1, abs(deltaH), acceptProbability, avgPlaq, doesAccept, 
-				doesAccept?energy_partition_new[1]:energy_partition_old[1]);
-		Fflush(pFile);
+//		Fprintf(pFile, "%i\t%.6e\t%.6e\t%.12e\t%i\t%.12e\n", 
+//				i + 1, abs(deltaH), acceptProbability, avgPlaq, doesAccept, 
+//				doesAccept?energy_partition_new[1]:energy_partition_old[1]);
+//		Fflush(pFile);
 
 		if((i + 1) % arg.num_step_between_output == 0 
 											&& i + 1 >= arg.num_step_before_output){
@@ -391,15 +390,6 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 			}
 			
 			sync_node();
-	
-			if(arg.summary_dir_stem.size() > 0){
-			// TODO: Test if doing pair would change the result.
-			//	derivative_field(dField, gField, arg, true);
-				derivative_field(dField, gField, arg, false);
-				Field<double> dField_output; dField_output.init(geo_coarse);
-				sophisticated_make_to_order(dField_output, dField);
-				sophisticated_serial_write(dField_output, arg.summary_dir_stem + "./dev_dump." + show(i + 1));
-			}
 		}
 	}
 
@@ -411,9 +401,6 @@ inline void run_chmc(Field<cps::Matrix> &gFieldExt, const Arg_chmc &arg, FILE *p
 //		dev_err[j] = jackknife(dev_list[j].data(), dev_list[j].size(), 
 //									int(ceil(ATC)), dev_val[j]);
 //	}
-
-	Fprintf(pFile, "Accept Rate = %.4f\n", (double)numAccept / (numAccept + numReject));
-	Fflush(pFile);
 
 	Timer::display();
 }
