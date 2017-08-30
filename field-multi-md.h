@@ -25,7 +25,7 @@ using namespace std;
 
 namespace md { // This a variant of the original functions.
 
-static const double md_alpha = -0.5;
+static const double md_alpha = 0.5;
 
 inline double get_xi_energy(
 	Field<cps::Matrix>& FgField, 
@@ -878,7 +878,7 @@ inline void run_hmc_multi(
 		init_momentum(FmField, Frng_field);
 //		should do Metropolis for CgField.
 	
-		if(i % 5 == 0){
+		if(i % 1 == 0){
 			fetch_expanded_chart(FgField, Fchart);
 			heatbath(CgField, FgField, Crng_field);
 		}
