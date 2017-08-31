@@ -408,7 +408,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 			
 			// 	test case start
 			// 	case 100: {
-			// 		get_staple_dagger(mStaple1, gField, x, mu);
+			//		get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
 			// 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1.;
 			// 		break;
 			// 	} 
