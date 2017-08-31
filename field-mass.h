@@ -25,7 +25,7 @@ using namespace std;
 
 namespace mass {
 
-const double MASS = 1.;
+const double MASS = 0.1;
 
 inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gField,
 			const Arg_chmc &arg){
@@ -92,7 +92,7 @@ inline void get_force(Field<cps::Matrix> &fField, const Field<cps::Matrix> &gFie
 					break;
 				}
 			 	case 100: {
-			 		get_staple_dagger(mStaple1, gField, x, mu);
+					get_extended_staple_dagger(mStaple1, gField, x, mu, arg.gauge.c1);
 			 		mTemp = mStaple1 * gField.get_elems_const(x)[mu] * -1. * MASS;
 			 		break;
 			 	} 
